@@ -1,0 +1,4 @@
+[submodule "kalulu-languages"]
+	path = kalulu-languages
+	url = https://github.com/Excello-Recherche-Education/Kalulu-Languages.git
+	branch = main

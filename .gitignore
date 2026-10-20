@@ -1,0 +1,19 @@
+# Generated booklets
+build/
+output/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+
+# Agent notes are kept in Kalulu-Main (docs/agent/) and symlinked here
+CLAUDE.md
