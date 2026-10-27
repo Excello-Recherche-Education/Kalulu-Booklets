@@ -10,8 +10,11 @@ educational app that helps children learn to read through the decoding
 (grapheme–phoneme) method, developed by
 [Excello Recherche & Éducation](https://github.com/Excello-Recherche-Education).
 
-> **Status: initial setup.** The repository holds the language packs and this
-> README; the generator itself is still to be written.
+> **Status: first version.** The generator writes the base booklet of every
+> booklet number a pack defines. The teacher's booklet, the booklet without
+> writing pages and the printing imposition are still to come, and so are the
+> covers' artwork and the illustrations (the penguin of the tables, the parrot
+> and stopwatches of the fluency tests).
 
 ## What it produces
 
@@ -92,8 +95,78 @@ git commit -m "Bump language packs"
 - Python 3.11 or newer
 - Git
 
-Installation and generation commands will be documented here as the
-generator is written.
+## Installing
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -e '.[dev]'
+```
+
+This installs [ReportLab](https://www.reportlab.com/) for the PDF and
+[uharfbuzz](https://github.com/harfbuzz/uharfbuzz) (HarfBuzz) for text shaping:
+the cursive font joins its letters through OpenType rules, which only a shaping
+engine applies.
+
+## Generating the booklets
+
+```bash
+.venv/bin/kalulu-booklets build fr_FR                         # the pack pinned in kalulu-languages/
+.venv/bin/kalulu-booklets build ../Kalulu-Languages/fr_FR     # any pack folder, saved or not
+.venv/bin/kalulu-booklets build fr_FR --booklet 1 --out /tmp/booklets
+```
+
+A bare locale reads the pack pinned in `kalulu-languages/`; a path reads any pack
+folder (or its `language.db`), such as a Kalulu-Languages checkout the Prof Tool
+has just saved to, so a change can be seen before it is committed. The pack is
+only ever read.
+
+One PDF is written per booklet, `build/<locale>/<locale>-booklet-<n>.pdf` by
+default. Then comes a list of what to look at: what the pack asks for and the
+booklet cannot print, such as a chapter with nothing in it, sentences that do not
+fit the pages allowed, or a sentence its lesson cannot read yet. None of it stops
+the build.
+
+### What a booklet holds
+
+The content of the booklets is edited in the **Booklets** tab of the
+[Prof Tool](https://github.com/Excello-Recherche-Education/Kalulu-ProfTool) and
+stored in the pack's `Booklet*` tables: see "The reading booklets" in the packs'
+`SCHEMA.md`. In short:
+
+- **chapters follow the app's lessons**, and say which booklet they are in;
+- each chapter page has its title (script on the left, cursive on the right), its
+  syllables and words, then its sentences, in paragraphs that alternate script
+  and cursive;
+- what a chapter does not list by hand is chosen from the pack: the syllables and
+  words readable at its lesson that hold one of its graphemes, the newest first,
+  then the shortest. Exceptions are left out, and so are entries with no vowel,
+  such as the `l` of `l'ours`;
+- silent letters are printed in grey where the chapter asks for it, found from
+  each word's grapheme-phoneme decomposition;
+- then come the chapter's tables, stories, writing pages (on Seyès ruling,
+  each model in black then in grey to trace over) and fluency test;
+- blank pages are added before the back cover to reach a multiple of four, since
+  a booklet is printed on folded sheets.
+
+### Tests
+
+```bash
+.venv/bin/python -m pytest
+```
+
+They build a small pack from the schema in `kalulu-languages/schema/`, so the
+submodule must be checked out.
+
+## Fonts
+
+| Font | Used for | License |
+|---|---|---|
+| [Mulish](https://github.com/googlefonts/mulish) | script | SIL Open Font License 1.1, `src/kalulu_booklets/fonts/OFL-Mulish.txt` |
+| [Marelle](https://marelle.forge.apps.education.fr) | cursive | SIL Open Font License 1.1, `src/kalulu_booklets/fonts/OFL-Marelle.txt` |
+
+Mulish is the copy the Kalulu app uses. Marelle is published by the French
+Ministry of Education (la Forge des communs numériques éducatifs) and is used
+unmodified.
 
 ## License
 
