@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-SCHEMA = Path(__file__).resolve().parents[1] / "kalulu-languages" / "schema" / "v3.sql"
+SCHEMA = Path(__file__).resolve().parents[1] / "kalulu-languages" / "schema" / "v4.sql"
 
 GPS = {  # id: (grapheme, phoneme, type)
     1: ("a", "a", 1),
@@ -33,7 +33,7 @@ SYLLABLES = {1: ("la", [2, 1]), 2: ("nu", [4, 3]), 3: ("lu", [2, 3]), 4: ("un", 
 SENTENCES = {1: ("La lune.", [1, 2]), 2: ("Une lune nue.", [4, 2])}
 
 
-def make_pack(folder: Path, version: int = 3) -> Path:
+def make_pack(folder: Path, version: int = 4) -> Path:
     if not SCHEMA.is_file():
         pytest.skip("kalulu-languages/ is not checked out (git submodule update --init)")
     pack = folder / "xx_XX"

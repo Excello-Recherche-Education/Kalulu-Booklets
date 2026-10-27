@@ -1,6 +1,6 @@
 """Reading a language pack's ``language.db``.
 
-The contract is Kalulu-Languages ``SCHEMA.md``, schema version 3: the lessons,
+The contract is Kalulu-Languages ``SCHEMA.md``, schema version 4: the lessons,
 the GPs they teach, the words, syllables and sentences with their
 decompositions, and the ``Booklet*`` tables that say what the booklets print and
 with which fonts.
@@ -15,7 +15,7 @@ from pathlib import Path
 
 from kalulu_booklets.text import lower
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # GPs.Type: 0 silent, 1 vowel, 2 consonant.
 SILENT, VOWEL, CONSONANT = 0, 1, 2
