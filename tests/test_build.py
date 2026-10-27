@@ -48,10 +48,11 @@ def test_refuses_a_booklet_the_pack_does_not_have(pack_folder, tmp_path, capsys)
     assert "has no booklet 3" in capsys.readouterr().err
 
 
-def test_sentences_beyond_their_pages_are_said(pack_folder, tmp_path, capsys):
-    chapter = add_chapter(pack_folder, 3, [3], SentencePages=1, SyllableCount=0, WordCount=0)
-    for position in range(60):
+@pytest.mark.parametrize("pages, room", [(0, "the page they start on"), (1, "that page and 1 more")])
+def test_sentences_beyond_their_pages_are_said(pack_folder, tmp_path, capsys, pages, room):
+    chapter = add_chapter(pack_folder, 3, [3], SentencePages=pages, SyllableCount=0, WordCount=0)
+    for position in range(90):
         execute(pack_folder, "INSERT INTO BookletSentences (ChapterID, SentenceID, Position, Break) VALUES (?, 1, ?, 1)",
                 chapter, position)
     assert main(["build", str(pack_folder), "--out", str(tmp_path)]) == 0
-    assert "take more than 1 page(s) (SentencePages)" in capsys.readouterr().out
+    assert f"do not fit on {room} (SentencePages is {pages})" in capsys.readouterr().out

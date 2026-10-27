@@ -220,8 +220,10 @@ class Layout:
         self.y -= rows * row + GAP
 
     def sentences(self, content: ChapterContent) -> None:
+        """On the page they start on, then on at most ``sentence_pages`` more;
+        lines past that are left out and said."""
         limit = content.sentence_pages
-        pages = 1
+        extra = 0
         dropped = 0
         for index, paragraph in enumerate(content.paragraphs):
             face = self.fonts.cursive if paragraph.font == CURSIVE else self.fonts.script
@@ -230,16 +232,17 @@ class Layout:
                 self.y -= leading * PARAGRAPH_GAP
             for line in _wrap(face, paragraph, SENTENCE_SIZE, WIDTH):
                 if dropped or leading > self.room():
-                    if dropped or (limit and pages >= limit):
+                    if dropped or extra >= limit:
                         dropped += 1
                         continue
                     self.new_page()
-                    pages += 1
+                    extra += 1
                 baseline = self.y - leading + (leading - face.x_height * SENTENCE_SIZE) / 2
                 self.add(_line_step(face, line, baseline, SENTENCE_SIZE))
                 self.y -= leading
         if dropped:
-            self.note(content, f"the sentences take more than {limit} page(s) (SentencePages): "
+            room = "the page they start on" if not limit else f"that page and {limit} more"
+            self.note(content, f"the sentences do not fit on {room} (SentencePages is {limit}): "
                                f"{dropped} line(s) are not printed")
         self.y -= GAP
 

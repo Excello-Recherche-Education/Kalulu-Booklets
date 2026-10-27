@@ -137,10 +137,15 @@ stored in the pack's `Booklet*` tables: see "The reading booklets" in the packs'
 - each chapter page has its title (script on the left, cursive on the right), its
   syllables and words, then its sentences, in paragraphs that alternate script
   and cursive;
-- what a chapter does not list by hand is chosen from the pack: the syllables and
-  words readable at its lesson that hold one of its graphemes, the newest first,
-  then the shortest. Exceptions are left out, and so are entries with no vowel,
-  such as the `l` of `l'ours`;
+- a chapter prints as many syllables and words as its counts say: the ones picked
+  for it first, in their order, the last ones left out when there are too many.
+  When there are too few, the rest is chosen from the pack: the syllables and
+  words readable at its lesson that hold one of its graphemes, booklet-only ones
+  first, then in the pack's order. Exceptions are left out, and so are entries
+  with no vowel, such as the `l` of `l'ours`. If even that falls short, what was
+  chosen is repeated until the count is reached;
+- the sentences fit on the page they start on (`SentencePages` 0), or take up to
+  that many more pages; -1 prints none;
 - silent letters are printed in grey where the chapter asks for it, found from
   each word's grapheme-phoneme decomposition;
 - then come the chapter's tables, stories, writing pages (on Seyès ruling,
