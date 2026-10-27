@@ -183,6 +183,18 @@ checkout the pack is in (`../Kalulu-Languages/fonts` for
 Both are under the SIL Open Font License 1.1; see `fonts/LICENSE.md` there.
 The PDFs embed the letters they use, which the license allows.
 
+**A language can replace any of the four**, the three weights of Mulish or
+Marelle, with another font of that `fonts/` folder: the pack lists it in its
+`BookletFonts` table and says what it replaces in `BookletSettings` (Kalulu-Languages'
+`SCHEMA.md`). It is set in the
+[Prof Tool](https://github.com/Excello-Recherche-Education/Kalulu-ProfTool):
+Booklets, *Language settings*, *Fonts*. The font then prints everywhere the one
+it replaces did. A font the pack names that is not in `fonts/` stops the build;
+a letter a font cannot print is listed after it, since it comes out as the
+font's empty box. A letter the font has no glyph for but can build from its
+parts is printed that way: Marelle has no `á`, and prints it as `a` and an
+accent.
+
 ## License
 
 This project, the generator and the booklets it produces, is licensed under the

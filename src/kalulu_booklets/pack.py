@@ -1,8 +1,9 @@
 """Reading a language pack's ``language.db``.
 
-The contract is Kalulu-Languages ``SCHEMA.md``, schema version 2: the lessons,
+The contract is Kalulu-Languages ``SCHEMA.md``, schema version 3: the lessons,
 the GPs they teach, the words, syllables and sentences with their
-decompositions, and the ``Booklet*`` tables that say what the booklets print.
+decompositions, and the ``Booklet*`` tables that say what the booklets print and
+with which fonts.
 The pack is opened read-only; nothing here ever writes to it.
 """
 
@@ -14,7 +15,7 @@ from pathlib import Path
 
 from kalulu_booklets.text import lower
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # GPs.Type: 0 silent, 1 vowel, 2 consonant.
 SILENT, VOWEL, CONSONANT = 0, 1, 2
@@ -34,6 +35,14 @@ SETTINGS = (
     "UppercaseProportion", "SentenceFont", "SentenceFirstFont", "SentencePages",
     "WritingModels", "WritingTracings",
 )
+
+
+# The fonts a language can replace (fonts.py's roles) -> the BookletSettings
+# column naming the BookletFonts row that replaces it; NULL keeps the default.
+FONT_COLUMNS = {
+    "script": "ScriptFontID", "script_bold": "ScriptBoldFontID",
+    "script_black": "ScriptBlackFontID", "cursive": "CursiveFontID",
+}
 
 
 class PackError(Exception):
@@ -79,6 +88,14 @@ class Sentence:
     exception: bool = False
     reading: bool = True
     booklet_only: bool = False
+
+
+@dataclass(frozen=True)
+class BookletFont:
+    """A font replacing a default one: a file of Kalulu-Languages' fonts/."""
+
+    name: str
+    file: str  # its path inside fonts/, folders separated by "/"
 
 
 @dataclass(frozen=True)
@@ -138,6 +155,8 @@ class Pack:
     # Lowercased text -> the IDs of every word or syllable spelled that way.
     words_by_text: dict[str, list[int]]
     syllables_by_text: dict[str, list[int]]
+    # Role (FONT_COLUMNS) -> the font replacing its default, for those replaced.
+    fonts: dict[str, BookletFont] = field(default_factory=dict)
 
     @property
     def cursive(self) -> bool:
@@ -204,6 +223,10 @@ def _load(db: sqlite3.Connection, path: Path) -> Pack:
     if row is None:
         raise PackError(f"{path} has no BookletSettings row")
     settings = {column: row[column] for column in ("Cursive",) + SETTINGS}
+    booklet_fonts = {font["ID"]: BookletFont(font["Name"], font["File"])
+                     for font in db.execute("SELECT ID, Name, File FROM BookletFonts")}
+    fonts = {role: booklet_fonts[row[column]] for role, column in FONT_COLUMNS.items()
+             if row[column] is not None and row[column] in booklet_fonts}
 
     chapters: dict[int, Chapter] = {}
     for row in db.execute("SELECT * FROM BookletChapters"):
@@ -230,7 +253,7 @@ def _load(db: sqlite3.Connection, path: Path) -> Pack:
         locale=path.parent.name, path=path, gps=gps, words=words, syllables=syllables,
         sentences=sentences, settings=settings,
         chapters=sorted(chapters.values(), key=lambda chapter: (chapter.lesson, chapter.position, chapter.id)),
-        words_by_text=_by_text(words), syllables_by_text=_by_text(syllables))
+        words_by_text=_by_text(words), syllables_by_text=_by_text(syllables), fonts=fonts)
 
 
 def _items(db: sqlite3.Connection, gps: dict[int, GP], table: str, column: str,
