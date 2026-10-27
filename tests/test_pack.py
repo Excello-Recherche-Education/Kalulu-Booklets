@@ -1,3 +1,5 @@
+import sqlite3
+
 import pytest
 
 from conftest import add_chapter, make_pack
@@ -7,6 +9,23 @@ from kalulu_booklets.pack import PackError, load
 def test_refuses_another_schema_version(tmp_path):
     with pytest.raises(PackError, match="schema version 1"):
         load(make_pack(tmp_path, version=1))
+
+
+def test_refuses_version_2(tmp_path):
+    with pytest.raises(PackError, match="schema version 2; this generator reads version 3"):
+        load(make_pack(tmp_path, version=2))
+
+
+def test_reads_the_fonts_that_replace_the_defaults(pack_folder):
+    db = sqlite3.connect(pack_folder / "language.db")
+    db.execute("INSERT INTO BookletFonts (ID, Name, File) VALUES (4, 'Loops', 'marelle/Marelle2-Regular.ttf')")
+    db.execute("INSERT INTO BookletFonts (ID, Name, File) VALUES (5, 'Unused', 'marelle/MarelleBaton-Regular.ttf')")
+    db.execute("UPDATE BookletSettings SET CursiveFontID = 4")
+    db.commit()
+    db.close()
+    fonts = load(pack_folder).fonts
+    assert list(fonts) == ["cursive"]
+    assert (fonts["cursive"].name, fonts["cursive"].file) == ("Loops", "marelle/Marelle2-Regular.ttf")
 
 
 def test_refuses_a_folder_without_language_db(tmp_path):

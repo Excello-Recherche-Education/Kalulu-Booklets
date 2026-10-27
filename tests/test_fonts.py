@@ -35,3 +35,31 @@ def test_mulish_is_converted_and_marelle_joins():
     # Marelle's joins are contextual alternates: some glyphs have no character
     # of their own, and ReportLab embeds them under private-use ones.
     assert any(0xE000 <= ord(glyph.char) <= 0xF8FF for glyph in faces.cursive.shape("la lune"))
+
+
+def test_a_replacing_font_must_be_in_the_folder(tmp_path):
+    shutil.copytree(pinned_or_skip(), tmp_path / "fonts")
+    (tmp_path / "xx_XX").mkdir()
+    pack_file = tmp_path / "xx_XX" / "language.db"
+    assert fonts.find(pack_file, {"cursive": "marelle/Marelle2-Regular.ttf"}) == tmp_path / "fonts"
+    with pytest.raises(fonts.FontError, match="andika/Andika-Regular.ttf"):
+        fonts.find(pack_file, {"script": "andika/Andika-Regular.ttf"})
+
+
+def test_a_replacing_font_prints_its_role():
+    folder = pinned_or_skip()
+    faces = fonts.load(folder, (("cursive", "marelle/MarelleBaton-Regular.ttf"),))
+    assert faces.cursive.file == "marelle/MarelleBaton-Regular.ttf"
+    assert faces.script.file == fonts.SCRIPT
+    assert faces.cursive.name != fonts.load(folder).cursive.name
+
+
+def test_a_letter_a_font_lacks_is_noted_but_one_it_composes_is_not():
+    faces = fonts.load(pinned_or_skip(), (("script_black", "marelle/Marelle2-Regular.ttf"),))
+    # Marelle has no precomposed "á": HarfBuzz prints it as "a" and an accent.
+    faces.script_black.shape("canción")
+    assert not faces.script_black.missing
+    faces.script_black.shape("ŋa")
+    assert faces.script_black.missing == {"ŋ"}
+    notes = fonts.missing_notes(faces, {"script_black": "Loops"})
+    assert notes == ["the black script font, Loops (fonts/marelle/Marelle2-Regular.ttf), has no ŋ: printed as an empty box"]

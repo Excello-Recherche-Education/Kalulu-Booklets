@@ -10,6 +10,13 @@ drawn letter by letter, the joins come out wrong. Each glyph is then drawn on
 its own, which is what lets a silent letter be grey in the middle of a joined
 cursive word: HarfBuzz says which letter every glyph comes from (its cluster).
 
+A language can replace any of the four with a font of the same folder
+(``BookletFonts`` in the pack): ``load`` takes the replacements by role. A
+letter a font cannot print, even from its parts as HarfBuzz composes them ("á"
+as "a" and a combining accent, which is how Marelle prints Spanish), comes out
+as the font's empty box; each face records the ones it met, for the build to
+point out.
+
 ReportLab only embeds TrueType outlines, and Kalulu's Mulish is CFF-flavoured
 OpenType, so a CFF font is converted to TrueType in memory before ReportLab
 gets it. HarfBuzz shapes from the file itself; the conversion keeps every glyph
@@ -39,6 +46,11 @@ SCRIPT_BOLD = "mulish/kalulu_mulish_bold.otf"
 SCRIPT_BLACK = "mulish/kalulu_mulish_black.otf"
 CURSIVE = "marelle/Marelle-Regular.ttf"
 
+# What each role prints with unless the pack replaces it.
+DEFAULTS = {"script": SCRIPT, "script_bold": SCRIPT_BOLD, "script_black": SCRIPT_BLACK, "cursive": CURSIVE}
+DEFAULT_NAMES = {"script": "Mulish", "script_bold": "Mulish bold", "script_black": "Mulish black", "cursive": "Marelle"}
+ROLE_NAMES = {"script": "script", "script_bold": "bold script", "script_black": "black script", "cursive": "cursive"}
+
 # Kalulu-Booklets' own checkout of the packs.
 PINNED = Path(__file__).resolve().parents[2] / "kalulu-languages" / "fonts"
 
@@ -47,14 +59,18 @@ class FontError(Exception):
     """No fonts folder holding the files the booklets print with."""
 
 
-def find(pack_file: Path) -> Path:
+def find(pack_file: Path, replaced: dict[str, str] | None = None) -> Path:
     """The fonts of the Kalulu-Languages checkout a pack is in; failing that,
-    those of the packs pinned in kalulu-languages/."""
+    those of the packs pinned in kalulu-languages/. The folder must hold every
+    file the booklets print with: the defaults, and the files of ``replaced``
+    (role -> path inside fonts/) instead of the defaults they replace."""
+    files = {**DEFAULTS, **(replaced or {})}
     candidates = [pack_file.resolve().parent.parent / "fonts", PINNED]
     for folder in candidates:
-        if all((folder / name).is_file() for name in (SCRIPT, SCRIPT_BOLD, SCRIPT_BLACK, CURSIVE)):
+        if all((folder / name).is_file() for name in files.values()):
             return folder
-    raise FontError("no fonts folder with Mulish and Marelle in "
+    looked_for = "Mulish and Marelle" if not replaced else ", ".join(sorted(set(files.values())))
+    raise FontError(f"no fonts folder with {looked_for} in "
                     + " or ".join(str(folder) for folder in candidates)
                     + " -- Kalulu-Languages keeps them in fonts/")
 
@@ -71,9 +87,13 @@ class Glyph:
 class Face:
     """A font file, registered with ReportLab and shaped with HarfBuzz."""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, file: str = ""):
         data = path.read_bytes()
         info = FontFile(io.BytesIO(data))
+        # Its path inside fonts/, as the pack names it.
+        self.file = file or path.name
+        # The characters met that this font cannot print, even from their parts.
+        self.missing: set[str] = set()
         # One name per file content: two fonts folders never share a name.
         self.name = f"{path.stem}-{hashlib.sha1(data).hexdigest()[:8]}"
         self.units = info["head"].unitsPerEm
@@ -97,6 +117,8 @@ class Face:
         glyphs: list[Glyph] = []
         x = 0.0
         for info, position in zip(buffer.glyph_infos, buffer.glyph_positions):
+            if info.codepoint == 0:  # .notdef: the font has nothing for it
+                self.missing.add(text[info.cluster])
             glyphs.append(Glyph(self._char_for(info.codepoint, position.x_advance), info.cluster,
                                 (x + position.x_offset) / self.units, position.y_offset / self.units,
                                 position.x_advance / self.units))
@@ -169,12 +191,26 @@ class Fonts:
     script_black: Face
     cursive: Face
 
+    def roles(self) -> dict[str, Face]:
+        return {role: getattr(self, role) for role in DEFAULTS}
+
 
 @lru_cache(maxsize=None)
-def load(folder: Path) -> Fonts:
-    return Fonts(
-        script=Face(folder / SCRIPT),
-        script_bold=Face(folder / SCRIPT_BOLD),
-        script_black=Face(folder / SCRIPT_BLACK),
-        cursive=Face(folder / CURSIVE),
-    )
+def load(folder: Path, replaced: tuple[tuple[str, str], ...] = ()) -> Fonts:
+    """The four faces, from ``folder``; ``replaced`` gives (role, path inside
+    fonts/) for those the pack replaces."""
+    files = {**DEFAULTS, **dict(replaced)}
+    return Fonts(**{role: Face(folder / file, file) for role, file in files.items()})
+
+
+def missing_notes(faces: Fonts, names: dict[str, str]) -> list[str]:
+    """What the build says about the characters a face met and cannot print.
+    ``names`` gives the pack's name for a replaced role's font."""
+    notes = []
+    for role, face in faces.roles().items():
+        if face.missing:
+            listed = " ".join(sorted(face.missing))
+            notes.append(f"the {ROLE_NAMES[role]} font, {names.get(role, DEFAULT_NAMES[role])} "
+                         f"(fonts/{face.file}), has no {listed}: "
+                         f"printed as an empty box")
+    return notes

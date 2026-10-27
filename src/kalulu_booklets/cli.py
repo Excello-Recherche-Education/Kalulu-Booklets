@@ -5,8 +5,9 @@
     kalulu-booklets build fr_FR --booklet 1 --out /tmp/booklets
 
 What cannot be printed as the pack asks (a chapter with nothing to print,
-sentences that do not fit their pages, a sentence its lesson cannot read yet) is
-listed after the files; it never stops the build.
+sentences that do not fit their pages, a sentence its lesson cannot read yet, a
+letter a font has no glyph for) is listed after the files; it never stops the
+build. A font the pack names that is not in fonts/ does.
 """
 
 from __future__ import annotations
@@ -35,7 +36,8 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         pack = load(_pack_path(arguments.pack))
-        faces = fonts.load(fonts.find(pack.path))
+        replaced = {role: font.file for role, font in pack.fonts.items()}
+        faces = fonts.load(fonts.find(pack.path, replaced), tuple(sorted(replaced.items())))
     except (PackError, fonts.FontError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
@@ -57,6 +59,7 @@ def main(argv: list[str] | None = None) -> int:
         pages = layout.write(booklet, faces, path)
         print(f"{path}  ({pages} pages, {len(booklet.chapters)} chapter(s))")
         notes.extend(f"booklet {number}, {note}" for note in booklet.notes)
+    notes.extend(fonts.missing_notes(faces, {role: font.name for role, font in pack.fonts.items()}))
     if notes:
         print("\nTo look at:")
         for note in notes:
