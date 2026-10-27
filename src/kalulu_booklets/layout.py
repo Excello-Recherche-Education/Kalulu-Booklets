@@ -23,7 +23,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen.canvas import Canvas
 
 from kalulu_booklets.content import CURSIVE, Booklet, ChapterContent, Paragraph, Styled, TableRow
-from kalulu_booklets.fonts import Face, Fonts, fonts
+from kalulu_booklets.fonts import Face, Fonts
 
 PAGE_WIDTH, PAGE_HEIGHT = A5
 MARGIN_SIDE = 14 * mm
@@ -98,9 +98,9 @@ class Page:
 class Layout:
     """Decides what goes on each page of one booklet."""
 
-    def __init__(self, booklet: Booklet):
+    def __init__(self, booklet: Booklet, fonts: Fonts):
         self.booklet = booklet
-        self.fonts: Fonts = fonts()
+        self.fonts = fonts
         self.pages: list[Page] = []
         self.y = TOP
 
@@ -346,15 +346,15 @@ class Layout:
 
 # --- Writing the PDF ---------------------------------------------------------------
 
-def write(booklet: Booklet, path: Path) -> int:
+def write(booklet: Booklet, fonts: Fonts, path: Path) -> int:
     """Lays out and writes one booklet; returns its number of pages."""
-    pages = Layout(booklet).run()
+    pages = Layout(booklet, fonts).run()
     path.parent.mkdir(parents=True, exist_ok=True)
     canvas = Canvas(str(path), pagesize=A5)
     canvas.setTitle(f"Kalulu - {booklet.locale} - {booklet.number}")
     canvas.setAuthor("Excello Recherche & Education")
     canvas.setSubject("Kalulu reading booklet")
-    script = fonts().script
+    script = fonts.script
     for number, page in enumerate(pages, start=1):
         for step in page.steps:
             canvas.saveState()

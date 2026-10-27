@@ -2,8 +2,16 @@
 
 import re
 
+import pytest
+
 from conftest import add_chapter, execute
+from kalulu_booklets import fonts
 from kalulu_booklets.cli import main
+
+# The test pack has no Kalulu-Languages checkout around it, so its fonts are
+# the pinned ones.
+pytestmark = pytest.mark.skipif(not (fonts.PINNED / fonts.CURSIVE).is_file(),
+                                reason="kalulu-languages/ has no fonts/ at its pinned commit")
 
 
 def page_count(path):

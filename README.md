@@ -159,14 +159,19 @@ submodule must be checked out.
 
 ## Fonts
 
-| Font | Used for | License |
-|---|---|---|
-| [Mulish](https://github.com/googlefonts/mulish) | script | SIL Open Font License 1.1, `src/kalulu_booklets/fonts/OFL-Mulish.txt` |
-| [Marelle](https://marelle.forge.apps.education.fr) | cursive | SIL Open Font License 1.1, `src/kalulu_booklets/fonts/OFL-Marelle.txt` |
+The booklets print with the fonts of the language packs, kept in
+Kalulu-Languages' [`fonts/`](https://github.com/Excello-Recherche-Education/Kalulu-Languages/tree/main/fonts)
+folder: no copy of them is kept here. They are read from the Kalulu-Languages
+checkout the pack is in (`../Kalulu-Languages/fonts` for
+`../Kalulu-Languages/fr_FR`), or else from `kalulu-languages/fonts`.
 
-Mulish is the copy the Kalulu app uses. Marelle is published by the French
-Ministry of Education (la Forge des communs numériques éducatifs) and is used
-unmodified.
+| Font | File | Used for |
+|---|---|---|
+| Mulish, the version modified for Kalulu | `mulish/kalulu_mulish_{regular,bold,black}.otf` | script |
+| Marelle | `marelle/Marelle-Regular.ttf` | cursive |
+
+Both are under the SIL Open Font License 1.1; see `fonts/LICENSE.md` there.
+The PDFs embed the letters they use, which the license allows.
 
 ## License
 

@@ -15,6 +15,9 @@ dependencies = [
     # Text shaping: Marelle joins its cursive letters through OpenType rules,
     # which only a shaping engine applies.
     "uharfbuzz>=0.40",
+    # Reads the fonts, and converts Kalulu's CFF Mulish to the TrueType
+    # outlines ReportLab embeds.
+    "fonttools>=4.40",
 ]
 
 [project.optional-dependencies]
@@ -25,9 +28,6 @@ kalulu-booklets = "kalulu_booklets.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-kalulu_booklets = ["fonts/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -15,7 +15,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from kalulu_booklets import content, layout
+from kalulu_booklets import content, fonts, layout
 from kalulu_booklets.pack import PackError, load
 
 REPOSITORY = Path(__file__).resolve().parents[2]
@@ -35,7 +35,8 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         pack = load(_pack_path(arguments.pack))
-    except PackError as error:
+        faces = fonts.load(fonts.find(pack.path))
+    except (PackError, fonts.FontError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
 
@@ -53,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     for number in numbers:
         booklet = content.booklet(pack, number)
         path = arguments.out / pack.locale / f"{pack.locale}-booklet-{number}.pdf"
-        pages = layout.write(booklet, path)
+        pages = layout.write(booklet, faces, path)
         print(f"{path}  ({pages} pages, {len(booklet.chapters)} chapter(s))")
         notes.extend(f"booklet {number}, {note}" for note in booklet.notes)
     if notes:
