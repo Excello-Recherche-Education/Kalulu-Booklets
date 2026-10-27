@@ -15,11 +15,16 @@ def texts(items):
 
 
 def test_automatic_words_hold_a_chapter_gp_and_are_readable(pack_folder):
-    _, chapter = chapter_content(pack_folder)
+    _, chapter = chapter_content(pack_folder, WordCount=4)
     # "la" holds no GP of the chapter, "lunule" is an exception, "l" has no
-    # vowel; "Luna" is booklet-only, which the booklets print. Newest first,
-    # then shortest.
-    assert texts(chapter.words) == ["nu", "une", "lune", "Luna"]
+    # vowel. Booklet-only first ("Luna"), then in the pack's order.
+    assert texts(chapter.words) == ["Luna", "lune", "une", "nu"]
+
+
+def test_words_short_of_the_count_are_repeated_and_said(pack_folder):
+    booklet, chapter = chapter_content(pack_folder, WordCount=6)
+    assert texts(chapter.words) == ["Luna", "lune", "une", "nu", "Luna", "lune"]
+    assert "Lesson 3, chapter 1: WordCount is 6, and only 4 words qualify: they are repeated" in booklet.notes
 
 
 def test_syllables_repeat_until_the_count(pack_folder):
@@ -27,14 +32,28 @@ def test_syllables_repeat_until_the_count(pack_folder):
     assert texts(chapter.syllables) == ["nu", "lu", "un", "nu", "lu"]
 
 
-def test_a_listed_part_replaces_the_automatic_choice(pack_folder):
+def add_entries(pack_folder, chapter_id, part, entries):
+    for position, text in enumerate(entries):
+        execute(pack_folder, "INSERT INTO BookletEntries (ChapterID, Part, Position, Text) VALUES (?, ?, ?, ?)",
+                chapter_id, part, position, text)
+
+
+def test_picks_past_the_count_lose_the_last_ones(pack_folder):
     chapter_id = add_chapter(pack_folder, 3, [3], WordCount=1)
-    execute(pack_folder, "INSERT INTO BookletEntries (ChapterID, Part, Position, Text) VALUES (?, 2, 0, 'la Lune')",
-            chapter_id)
-    execute(pack_folder, "INSERT INTO BookletEntries (ChapterID, Part, Position, Text) VALUES (?, 2, 1, 'une lune')",
-            chapter_id)
+    add_entries(pack_folder, chapter_id, 2, ["la Lune", "une lune"])
+    booklet = content.booklet(load(pack_folder), 1)
+    assert texts(booklet.chapters[0].words) == ["la Lune"]
+    assert "Lesson 3, chapter 1: 2 words picked and WordCount is 1: the last 1 are left out" in booklet.notes
+
+
+def test_picks_short_of_the_count_are_filled_from_the_pack(pack_folder):
+    chapter_id = add_chapter(pack_folder, 3, [3], WordCount=3, SyllableCount=3)
+    add_entries(pack_folder, chapter_id, 2, ["la Lune"])
+    add_entries(pack_folder, chapter_id, 1, ["un"])
     chapter = content.booklet(load(pack_folder), 1).chapters[0]
-    assert texts(chapter.words) == ["la Lune", "une lune"]  # all of them, whatever WordCount
+    # "lune" is already printed, as "la Lune": the fill skips it.
+    assert texts(chapter.words) == ["la Lune", "Luna", "une"]
+    assert texts(chapter.syllables) == ["un", "nu", "lu"]
 
 
 def test_silent_letters_come_from_the_decomposition(pack_folder):
@@ -99,7 +118,7 @@ def test_a_sentence_keeps_its_own_words_for_grey(pack_folder):
 
 
 def test_a_chapter_that_prints_nothing_is_left_out_and_said(pack_folder):
-    booklet, chapter = chapter_content(pack_folder, SyllableCount=0, WordCount=0)
+    booklet, chapter = chapter_content(pack_folder, SyllableCount=0, WordCount=0, SentencePages=-1)
     assert chapter is None
     assert booklet.notes == ["Lesson 3, chapter 1: prints nothing, so it has no page"]
 
@@ -109,3 +128,39 @@ def test_a_sentence_read_only_later_is_said(pack_folder):
     add_sentences(pack_folder, chapter_id, [2])
     booklet = content.booklet(load(pack_folder), 1)
     assert 'Lesson 2, chapter 1: sentence "La lune." is readable from lesson 3' in booklet.notes
+
+
+def test_sentence_pages_minus_one_prints_no_sentence(pack_folder):
+    chapter_id = add_chapter(pack_folder, 3, [3], SentencePages=-1)
+    add_sentences(pack_folder, chapter_id, [2, 2])
+    booklet = content.booklet(load(pack_folder), 1)
+    assert booklet.chapters[0].paragraphs == []
+    assert "Lesson 3, chapter 1: SentencePages is -1, so its 2 sentence(s) are not printed" in booklet.notes
+
+
+def test_a_chapter_picking_no_sentence_chooses_from_the_pack(pack_folder):
+    execute(pack_folder, "INSERT INTO Sentences (ID, Sentence, BookletOnly) VALUES (3, 'Une lune.', 1)")
+    for position, word_id in enumerate([4, 2]):
+        execute(pack_folder, "INSERT INTO WordsInSentences (SentenceID, WordID, Position) VALUES (3, ?, ?)",
+                word_id, position)
+    _, chapter = chapter_content(pack_folder)
+    assert chapter.paragraphs == []
+    # Booklet-only first, then the pack's order.
+    assert [(sentence_id, text.text) for sentence_id, text in chapter.sentence_pool] == [
+        (3, "Une lune."), (1, "La lune."), (2, "Une lune nue.")]
+
+
+def test_sentences_holding_the_chapter_gps_come_before_the_others(pack_folder):
+    execute(pack_folder, "INSERT INTO Sentences (ID, Sentence) VALUES (3, 'La la.')")
+    for position in range(2):
+        execute(pack_folder, "INSERT INTO WordsInSentences (SentenceID, WordID, Position) VALUES (3, 1, ?)", position)
+    add_chapter(pack_folder, 3, [3], SyllableCount=0, WordCount=0)  # teaches "u": "La la." has none
+    chapter = content.booklet(load(pack_folder), 1).chapters[0]
+    assert [sentence_id for sentence_id, _ in chapter.sentence_pool] == [1, 2, 3]
+
+
+def test_a_chapter_its_lesson_reads_no_sentence_of_says_so(pack_folder):
+    add_chapter(pack_folder, 2, [2], Title="L l")  # "La lune." is only readable at lesson 3
+    booklet = content.booklet(load(pack_folder), 1)
+    assert booklet.chapters[0].sentence_pool == []
+    assert "Lesson 2, chapter 1: no sentence is readable at this lesson" in booklet.notes

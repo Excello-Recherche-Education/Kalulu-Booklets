@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 
 from kalulu_booklets import pack as packs
 from kalulu_booklets.pack import Chapter, Item, Pack
-from kalulu_booklets.text import lower, upper, word_spans
+from kalulu_booklets.text import lower, upper, word_spans, words_of
 
 SCRIPT, CURSIVE = "script", "cursive"
 
@@ -66,7 +66,13 @@ class ChapterContent:
     words: list[Styled]
     word_columns: int
     paragraphs: list[Paragraph]
-    # Pages the sentences may take at most; 0 for no limit.
+    # When the chapter picks no sentence: the ones the layout may choose from,
+    # in order, as many as fit (each a paragraph of its own). The fonts
+    # paragraphs alternate between, and the share printed in capitals.
+    sentence_pool: list[tuple[int, Styled]]
+    sentence_fonts: tuple[str, str]
+    sentence_uppercase: float
+    # Pages the sentences may take after the one they start on; 0 for none.
     sentence_pages: int
     tables: list[list[TableRow]]
     writing: list[str]
@@ -77,8 +83,8 @@ class ChapterContent:
     stories: list[tuple[str, list[Styled]]]
 
     def is_empty(self) -> bool:
-        return not (self.title or self.syllables or self.words or self.paragraphs or self.tables
-                    or self.writing or self.fluency or self.stories)
+        return not (self.title or self.syllables or self.words or self.paragraphs or self.sentence_pool
+                    or self.tables or self.writing or self.fluency or self.stories)
 
 
 @dataclass
@@ -111,8 +117,15 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
     grey = chapter.grey_silent
     uppercase = float(setting("UppercaseProportion"))
 
-    syllables = _syllables(pack, chapter, int(setting("SyllableCount")), notes)
-    words = _words(pack, chapter, int(setting("WordCount")), notes)
+    syllables = _picked(pack, chapter, packs.SYLLABLES, int(setting("SyllableCount")), notes)
+    words = _picked(pack, chapter, packs.WORDS, int(setting("WordCount")), notes)
+    # -1 prints no sentence at all.
+    sentence_pages = int(setting("SentencePages"))
+    if sentence_pages < 0 and chapter.sentences:
+        notes.append(f"SentencePages is -1, so its {len(chapter.sentences)} sentence(s) are not printed")
+    pool = _sentence_pool(pack, chapter, grey) if sentence_pages >= 0 and not chapter.sentences else []
+    if sentence_pages >= 0 and not chapter.sentences and not pool:
+        notes.append("no sentence is readable at this lesson")
 
     return ChapterContent(
         chapter=chapter,
@@ -121,8 +134,11 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
         syllable_columns=int(setting("SyllableColumns")),
         words=_capitals(words, uppercase),
         word_columns=int(setting("WordColumns")),
-        paragraphs=_paragraphs(pack, chapter, grey, uppercase, notes),
-        sentence_pages=int(setting("SentencePages")),
+        paragraphs=_paragraphs(pack, chapter, grey, uppercase, notes) if sentence_pages >= 0 else [],
+        sentence_pool=pool,
+        sentence_fonts=(_paragraph_font(pack, chapter, 0), _paragraph_font(pack, chapter, 1)),
+        sentence_uppercase=uppercase,
+        sentence_pages=max(sentence_pages, 0),
         tables=_tables(pack, chapter, grey),
         writing=[entry.text for entry in chapter.entries.get(packs.WRITING, [])],
         writing_font=CURSIVE if pack.cursive else SCRIPT,
@@ -136,52 +152,48 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
 
 # --- Syllables and words ---------------------------------------------------------
 
-def _syllables(pack: Pack, chapter: Chapter, count: int, notes: list[str]) -> list[Styled]:
-    """``count`` syllables, the listed ones or the automatic choice, repeated
-    until the count is reached."""
-    listed = chapter.entries.get(packs.SYLLABLES)
-    if listed:
-        chosen = [styled(pack, entry.text, chapter.grey_silent, syllables_too=True) for entry in listed]
-        if len(chosen) > count:
-            notes.append(f"{len(chosen)} syllables listed and SyllableCount is {count}: "
-                         f"only the first {count} are printed")
-    else:
-        chosen = [_styled_item(pack, item, chapter.grey_silent)
-                  for item in _automatic(pack, pack.syllables, chapter)]
-        if count and not chosen:
-            notes.append("no syllable readable at this lesson holds one of the chapter's GPs")
-    if not chosen:
+def _picked(pack: Pack, chapter: Chapter, part: int, count: int, notes: list[str]) -> list[Styled]:
+    """``count`` syllables or words (SCHEMA.md): the chapter's picks first, in
+    their order, the last ones left out past the count. Short of it, the rest is
+    filled from the pack (``_automatic``), and when that runs out too, what was
+    chosen is repeated until the count is reached."""
+    kind, column = ("syllable", "SyllableCount") if part == packs.SYLLABLES else ("word", "WordCount")
+    entries = chapter.entries.get(part, [])
+    listed = [styled(pack, entry.text, chapter.grey_silent, syllables_too=part == packs.SYLLABLES)
+              for entry in entries]
+    if len(listed) > count:
+        notes.append(f"{len(listed)} {kind}s picked and {column} is {count}: "
+                     f"the last {len(listed) - count} are left out")
+        return listed[:count]
+    # A pick printed "la Lune" is the pack's "lune": it is not filled in twice.
+    picked = {word for entry in entries for word in words_of(entry.text)}
+    items = pack.syllables if part == packs.SYLLABLES else pack.words
+    filling = [_styled_item(pack, item, chapter.grey_silent)
+               for item in _automatic(pack, items, chapter) if lower(item.text) not in picked]
+    chosen = listed + filling[:count - len(listed)]
+    if count and not chosen:
+        notes.append(f"no {kind} readable at this lesson holds one of the chapter's GPs")
         return []
+    # A syllable grid repeats its syllables by design; words only for want of more.
+    if part == packs.WORDS and len(chosen) < count:
+        notes.append(f"{column} is {count}, and only {len(chosen)} words qualify: they are repeated")
     return [chosen[index % len(chosen)] for index in range(count)]
 
 
-def _words(pack: Pack, chapter: Chapter, count: int, notes: list[str]) -> list[Styled]:
-    """The listed words, all of them; or ``count`` chosen automatically."""
-    listed = chapter.entries.get(packs.WORDS)
-    if listed:
-        return [styled(pack, entry.text, chapter.grey_silent) for entry in listed]
-    chosen = _automatic(pack, pack.words, chapter)
-    if count and not chosen:
-        notes.append("no word readable at this lesson holds one of the chapter's GPs")
-    elif len(chosen) < count:
-        notes.append(f"WordCount is {count}, and only {len(chosen)} words qualify")
-    return [_styled_item(pack, item, chapter.grey_silent) for item in chosen[:count]]
-
-
 def _automatic(pack: Pack, items: dict[int, Item], chapter: Chapter) -> list[Item]:
-    """What a chapter prints when nothing is listed (SCHEMA.md): the entries
+    """What fills a chapter's syllables or words (SCHEMA.md): the entries
     readable at its lesson that hold at least one of its GPs. Exceptions are left
     out, as the game leaves them out, and so is an entry with no vowel: such a
     "word" is the elided form a sentence needs ("l" of "l'ours"), never read
-    alone. New at this lesson first, then the shortest, then in the pack's order;
-    one entry per spelling."""
+    alone. Booklet-only entries first, then in the pack's order; one entry per
+    spelling."""
     taught = set(chapter.gp_ids)
     vowels = {gp.id for gp in pack.gps.values() if gp.type == packs.VOWEL}
     candidates = [item for item in items.values()
                   if not item.exception and item.reading and item.lesson is not None
                   and item.lesson <= chapter.lesson and taught.intersection(item.gp_ids)
                   and vowels.intersection(item.gp_ids)]
-    candidates.sort(key=lambda item: (item.lesson != chapter.lesson, len(item.gp_ids), item.id))
+    candidates.sort(key=lambda item: (not item.booklet_only, item.id))
     seen: set[str] = set()
     chosen: list[Item] = []
     for item in candidates:
@@ -225,6 +237,24 @@ def _paragraphs(pack: Pack, chapter: Chapter, grey: bool, uppercase: float,
         paragraphs[-1].lines[-1].append(pieces[0])
         paragraphs[-1].lines.extend([piece] for piece in pieces[1:])
     return paragraphs
+
+
+def _sentence_pool(pack: Pack, chapter: Chapter, grey: bool) -> list[tuple[int, Styled]]:
+    """What a chapter that picks no sentence chooses from: the sentences readable
+    at its lesson, exceptions left out. Those with a word holding one of its GPs
+    come first, then the others, since the point is to fill the pages; within
+    each, booklet-only ones first, then in the pack's order. The layout takes as
+    many as fit, whole."""
+    taught = set(chapter.gp_ids)
+    ranked = []
+    for sentence in pack.sentences.values():
+        lesson = _sentence_lesson(pack, sentence)
+        if sentence.exception or not sentence.reading or lesson is None or lesson > chapter.lesson:
+            continue
+        teaches = any(taught.intersection(pack.words[word_id].gp_ids) for word_id in sentence.word_ids)
+        ranked.append(((not teaches, not sentence.booklet_only, sentence.id), sentence))
+    ranked.sort(key=lambda pair: pair[0])
+    return [(sentence.id, styled(pack, sentence.text, grey, linked=sentence.word_ids)) for _, sentence in ranked]
 
 
 def _paragraph_font(pack: Pack, chapter: Chapter, index: int) -> str:

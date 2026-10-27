@@ -76,6 +76,9 @@ class Sentence:
     id: int
     text: str
     word_ids: tuple[int, ...]
+    exception: bool = False
+    reading: bool = True
+    booklet_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -192,8 +195,10 @@ def _load(db: sqlite3.Connection, path: Path) -> Pack:
     linked: dict[int, list[int]] = {}
     for row in db.execute("SELECT SentenceID, WordID FROM WordsInSentences ORDER BY SentenceID, Position"):
         linked.setdefault(row["SentenceID"], []).append(row["WordID"])
-    sentences = {row["ID"]: Sentence(row["ID"], row["Sentence"], tuple(linked.get(row["ID"], ())))
-                 for row in db.execute("SELECT ID, Sentence FROM Sentences")}
+    sentences = {row["ID"]: Sentence(row["ID"], row["Sentence"], tuple(linked.get(row["ID"], ())),
+                                     bool(row["Exception"]), row["Reading"] is None or row["Reading"] != 0,
+                                     bool(row["BookletOnly"]))
+                 for row in db.execute("SELECT ID, Sentence, Exception, Reading, BookletOnly FROM Sentences")}
 
     row = db.execute("SELECT * FROM BookletSettings ORDER BY ID LIMIT 1").fetchone()
     if row is None:
