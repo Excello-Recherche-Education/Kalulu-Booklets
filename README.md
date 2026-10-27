@@ -145,7 +145,12 @@ stored in the pack's `Booklet*` tables: see "The reading booklets" in the packs'
   with no vowel, such as the `l` of `l'ours`. If even that falls short, what was
   chosen is repeated until the count is reached;
 - the sentences fit on the page they start on (`SentencePages` 0), or take up to
-  that many more pages; -1 prints none;
+  that many more pages; -1 prints none. A chapter that picks no sentence gets
+  as many as fit, each whole and a paragraph of its own: the sentences readable
+  at its lesson, those holding one of its graphemes first, booklet-only ones
+  first within each, then in the pack's order. One that would run onto the
+  next page is passed over for a shorter one, and one already printed in the
+  booklet comes after the others;
 - silent letters are printed in grey where the chapter asks for it, found from
   each word's grapheme-phoneme decomposition;
 - then come the chapter's tables, stories, writing pages (on Seyès ruling,

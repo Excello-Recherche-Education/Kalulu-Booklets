@@ -103,6 +103,9 @@ class Layout:
         self.fonts = fonts
         self.pages: list[Page] = []
         self.y = TOP
+        # Sentences this booklet has printed, so a chosen one is not repeated
+        # while others are left.
+        self.printed_sentences: set[int] = set()
 
     # --- Pages ---------------------------------------------------------------------
 
@@ -167,6 +170,8 @@ class Layout:
             self.grid(content, content.words, content.word_columns, WORD_SIZE, WORD_ROW)
         if content.paragraphs:
             self.sentences(content)
+        elif content.sentence_pool:
+            self.chosen_sentences(content)
         for table in content.tables:
             self.table(table)
         for title, paragraphs in content.stories:
@@ -225,6 +230,7 @@ class Layout:
         limit = content.sentence_pages
         extra = 0
         dropped = 0
+        self.printed_sentences.update(item.sentence_id for item in content.chapter.sentences)
         for index, paragraph in enumerate(content.paragraphs):
             face = self.fonts.cursive if paragraph.font == CURSIVE else self.fonts.script
             leading = SENTENCE_SIZE * (CURSIVE_LEADING if paragraph.font == CURSIVE else SCRIPT_LEADING)
@@ -244,6 +250,49 @@ class Layout:
             room = "the page they start on" if not limit else f"that page and {limit} more"
             self.note(content, f"the sentences do not fit on {room} (SentencePages is {limit}): "
                                f"{dropped} line(s) are not printed")
+        self.y -= GAP
+
+    def chosen_sentences(self, content: ChapterContent) -> None:
+        """A chapter that picks no sentence: as many of its pool as fit on the
+        page they start on and on ``sentence_pages`` more, each whole. One that
+        would run onto the next page is passed over for a later one that fits;
+        one already printed in this booklet comes after the others."""
+        pool = sorted(content.sentence_pool, key=lambda candidate: candidate[0] in self.printed_sentences)
+        extra = 0
+        placed = 0
+        top_of_page = False
+        while pool:
+            fitting = None
+            for index, (sentence_id, text) in enumerate(pool):
+                font = content.sentence_fonts[placed % 2]
+                face = self.fonts.cursive if font == CURSIVE else self.fonts.script
+                leading = SENTENCE_SIZE * (CURSIVE_LEADING if font == CURSIVE else SCRIPT_LEADING)
+                if int((placed + 1) * content.sentence_uppercase) > int(placed * content.sentence_uppercase):
+                    text = text.upper()
+                lines = _wrap(face, Paragraph(font, [[piece] for piece in text.lines()]), SENTENCE_SIZE, WIDTH)
+                gap = leading * PARAGRAPH_GAP if placed and not top_of_page else 0
+                if gap + len(lines) * leading <= self.room():
+                    fitting = (index, sentence_id, face, leading, lines, gap)
+                    break
+            if fitting is None:
+                # Nothing left fits here: another page, if one is allowed and
+                # this is not already a fresh one.
+                if top_of_page or extra >= content.sentence_pages:
+                    break
+                self.new_page()
+                extra += 1
+                top_of_page = True
+                continue
+            index, sentence_id, face, leading, lines, gap = fitting
+            self.y -= gap
+            for line in lines:
+                baseline = self.y - leading + (leading - face.x_height * SENTENCE_SIZE) / 2
+                self.add(_line_step(face, line, baseline, SENTENCE_SIZE))
+                self.y -= leading
+            self.printed_sentences.add(sentence_id)
+            pool.pop(index)
+            placed += 1
+            top_of_page = False
         self.y -= GAP
 
     def table(self, rows: list[TableRow]) -> None:

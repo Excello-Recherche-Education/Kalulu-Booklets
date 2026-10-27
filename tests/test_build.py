@@ -5,8 +5,9 @@ import re
 import pytest
 
 from conftest import add_chapter, execute
-from kalulu_booklets import fonts
+from kalulu_booklets import content, fonts, layout
 from kalulu_booklets.cli import main
+from kalulu_booklets.pack import load
 
 # The test pack has no Kalulu-Languages checkout around it, so its fonts are
 # the pinned ones.
@@ -56,3 +57,21 @@ def test_sentences_beyond_their_pages_are_said(pack_folder, tmp_path, capsys, pa
                 chapter, position)
     assert main(["build", str(pack_folder), "--out", str(tmp_path)]) == 0
     assert f"do not fit on {room} (SentencePages is {pages})" in capsys.readouterr().out
+
+
+def test_chosen_sentences_are_whole_and_one_that_overflows_is_passed_over(pack_folder):
+    long_one = "Une lune nue. " * 12
+    execute(pack_folder, "INSERT INTO Sentences (ID, Sentence) VALUES (3, ?)", long_one.strip())
+    for position in range(24):
+        execute(pack_folder, "INSERT INTO WordsInSentences (SentenceID, WordID, Position) VALUES (3, ?, ?)",
+                [4, 2][position % 2], position)
+    add_chapter(pack_folder, 3, [3], SentencePages=0)
+    booklet = content.booklet(load(pack_folder), 1)
+    chapter = booklet.chapters[0]
+    chapter.sentence_pool.sort(key=lambda candidate: candidate[0] != 3)  # the long one first
+    pages = layout.Layout(booklet, fonts.load(fonts.PINNED))
+    pages.new_page()
+    pages.y = layout.BOTTOM + 3 * layout.SENTENCE_SIZE * layout.CURSIVE_LEADING  # room for three lines
+    pages.chosen_sentences(chapter)
+    assert pages.printed_sentences == {1, 2}  # the long one does not fit, the two short ones do
+    assert len(pages.pages) == 1

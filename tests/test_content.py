@@ -118,7 +118,7 @@ def test_a_sentence_keeps_its_own_words_for_grey(pack_folder):
 
 
 def test_a_chapter_that_prints_nothing_is_left_out_and_said(pack_folder):
-    booklet, chapter = chapter_content(pack_folder, SyllableCount=0, WordCount=0)
+    booklet, chapter = chapter_content(pack_folder, SyllableCount=0, WordCount=0, SentencePages=-1)
     assert chapter is None
     assert booklet.notes == ["Lesson 3, chapter 1: prints nothing, so it has no page"]
 
@@ -136,3 +136,31 @@ def test_sentence_pages_minus_one_prints_no_sentence(pack_folder):
     booklet = content.booklet(load(pack_folder), 1)
     assert booklet.chapters[0].paragraphs == []
     assert "Lesson 3, chapter 1: SentencePages is -1, so its 2 sentence(s) are not printed" in booklet.notes
+
+
+def test_a_chapter_picking_no_sentence_chooses_from_the_pack(pack_folder):
+    execute(pack_folder, "INSERT INTO Sentences (ID, Sentence, BookletOnly) VALUES (3, 'Une lune.', 1)")
+    for position, word_id in enumerate([4, 2]):
+        execute(pack_folder, "INSERT INTO WordsInSentences (SentenceID, WordID, Position) VALUES (3, ?, ?)",
+                word_id, position)
+    _, chapter = chapter_content(pack_folder)
+    assert chapter.paragraphs == []
+    # Booklet-only first, then the pack's order.
+    assert [(sentence_id, text.text) for sentence_id, text in chapter.sentence_pool] == [
+        (3, "Une lune."), (1, "La lune."), (2, "Une lune nue.")]
+
+
+def test_sentences_holding_the_chapter_gps_come_before_the_others(pack_folder):
+    execute(pack_folder, "INSERT INTO Sentences (ID, Sentence) VALUES (3, 'La la.')")
+    for position in range(2):
+        execute(pack_folder, "INSERT INTO WordsInSentences (SentenceID, WordID, Position) VALUES (3, 1, ?)", position)
+    add_chapter(pack_folder, 3, [3], SyllableCount=0, WordCount=0)  # teaches "u": "La la." has none
+    chapter = content.booklet(load(pack_folder), 1).chapters[0]
+    assert [sentence_id for sentence_id, _ in chapter.sentence_pool] == [1, 2, 3]
+
+
+def test_a_chapter_its_lesson_reads_no_sentence_of_says_so(pack_folder):
+    add_chapter(pack_folder, 2, [2], Title="L l")  # "La lune." is only readable at lesson 3
+    booklet = content.booklet(load(pack_folder), 1)
+    assert booklet.chapters[0].sentence_pool == []
+    assert "Lesson 2, chapter 1: no sentence is readable at this lesson" in booklet.notes
