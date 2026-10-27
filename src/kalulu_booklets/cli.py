@@ -44,8 +44,10 @@ def main(argv: list[str] | None = None) -> int:
 
     numbers = arguments.booklet or pack.booklets()
     if not numbers:
-        print(f"{pack.path}: no booklet chapter yet (BookletChapters is empty)", file=sys.stderr)
+        print(f"{pack.path}: no lesson, so no booklet chapter", file=sys.stderr)
         return 1
+    if pack.default_chapters:
+        print(f"{pack.locale} has no booklet chapter: one per lesson, from its GPs, all in booklet 1")
     missing = [number for number in numbers if number not in pack.booklets()]
     if missing:
         print(f"error: {pack.locale} has no booklet {', '.join(map(str, missing))}; "
