@@ -38,9 +38,12 @@ def test_builds_one_pdf_per_booklet(pack_folder, tmp_path, capsys):
     assert "xx_XX-booklet-1.pdf" in capsys.readouterr().out
 
 
-def test_says_when_there_is_no_chapter(pack_folder, tmp_path, capsys):
-    assert main(["build", str(pack_folder), "--out", str(tmp_path)]) == 1
-    assert "no booklet chapter yet" in capsys.readouterr().err
+def test_a_pack_without_chapters_prints_one_per_lesson(pack_folder, tmp_path, capsys):
+    assert main(["build", str(pack_folder), "--out", str(tmp_path)]) == 0
+    out = capsys.readouterr().out
+    assert "has no booklet chapter: one per lesson" in out
+    assert ", 3 chapter(s))" in out
+    assert (tmp_path / "xx_XX" / "xx_XX-booklet-1.pdf").is_file()
 
 
 def test_refuses_a_booklet_the_pack_does_not_have(pack_folder, tmp_path, capsys):

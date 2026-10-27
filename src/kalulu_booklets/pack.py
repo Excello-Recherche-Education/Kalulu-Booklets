@@ -157,6 +157,9 @@ class Pack:
     syllables_by_text: dict[str, list[int]]
     # Role (FONT_COLUMNS) -> the font replacing its default, for those replaced.
     fonts: dict[str, BookletFont] = field(default_factory=dict)
+    # True when BookletChapters is empty and the chapters are the default ones,
+    # one per lesson (default_chapters()).
+    default_chapters: bool = False
 
     @property
     def cursive(self) -> bool:
@@ -249,11 +252,50 @@ def _load(db: sqlite3.Connection, path: Path) -> Pack:
         if row["ChapterID"] in chapters:
             chapters[row["ChapterID"]].stories.append(Story(row["Title"], row["Text"]))
 
+    made = not chapters
+    if made:
+        lesson_gps: dict[int, list[int]] = {}
+        for row in db.execute("SELECT LessonID, GPID FROM GPsInLessons ORDER BY ID"):
+            lesson_gps.setdefault(row["LessonID"], []).append(row["GPID"])
+        chapters = {chapter.id: chapter for chapter in default_chapters(lesson_numbers, lesson_gps, gps)}
+
     return Pack(
         locale=path.parent.name, path=path, gps=gps, words=words, syllables=syllables,
         sentences=sentences, settings=settings,
         chapters=sorted(chapters.values(), key=lambda chapter: (chapter.lesson, chapter.position, chapter.id)),
-        words_by_text=_by_text(words), syllables_by_text=_by_text(syllables), fonts=fonts)
+        words_by_text=_by_text(words), syllables_by_text=_by_text(syllables), fonts=fonts,
+        default_chapters=made)
+
+
+def default_chapters(lesson_numbers: dict[int, int], lesson_gps: dict[int, list[int]],
+                     gps: dict[int, GP]) -> list[Chapter]:
+    """The chapters of a pack that has none: one per lesson, as the Prof Tool's
+    Booklets screen makes them (BookletData.add_default_chapters()), with the
+    lesson's GPs, a title made of them, booklet 1 and the language's settings.
+    Their IDs are negative, which no row has. The teacher's picture is left out:
+    the teacher's booklet is not printed yet."""
+    chapters = []
+    for lesson_id, number in sorted(lesson_numbers.items(), key=lambda pair: pair[1]):
+        gp_ids = list(dict.fromkeys(lesson_gps.get(lesson_id, [])))
+        chapters.append(Chapter(id=-number, lesson=number, position=0, booklet=1, title=title_for(gp_ids, gps),
+                                image_gp_id=None, grey_silent=False, overrides={}, gp_ids=gp_ids))
+    return chapters
+
+
+def title_for(gp_ids: list[int], gps: dict[int, GP]) -> str:
+    """A title from GPs, as the Prof Tool's BookletData.title_for() makes it: each
+    grapheme once, exceptions and silent letters left out unless nothing else is
+    left, a single letter with its capital ("L l")."""
+    kept = [gp_id for gp_id in gp_ids if gp_id in gps and not gps[gp_id].exception and not gps[gp_id].silent]
+    parts: list[str] = []
+    for gp_id in kept or gp_ids:
+        if gp_id not in gps:
+            continue
+        grapheme = gps[gp_id].grapheme
+        text = f"{grapheme.upper()} {grapheme}" if len(grapheme) == 1 and grapheme.upper() != grapheme else grapheme
+        if text not in parts:
+            parts.append(text)
+    return " ".join(parts)
 
 
 def _items(db: sqlite3.Connection, gps: dict[int, GP], table: str, column: str,

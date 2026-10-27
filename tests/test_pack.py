@@ -28,6 +28,23 @@ def test_reads_the_fonts_that_replace_the_defaults(pack_folder):
     assert (fonts["cursive"].name, fonts["cursive"].file) == ("Loops", "marelle/Marelle2-Regular.ttf")
 
 
+def test_a_pack_without_chapters_gets_one_per_lesson(pack_folder):
+    pack = load(pack_folder)
+    assert pack.default_chapters
+    assert [(c.lesson, c.title, c.gp_ids, c.booklet, c.position) for c in pack.chapters] == [
+        (1, "A a", [1], 1, 0),
+        (2, "L l", [2], 1, 0),
+        (3, "U u N n", [3, 4, 5], 1, 0),  # the silent e is taught, not in the title
+    ]
+    assert all(chapter.id < 0 and not chapter.overrides for chapter in pack.chapters)
+
+
+def test_one_chapter_in_the_pack_means_no_default_ones(pack_folder):
+    add_chapter(pack_folder, 2, [2])
+    pack = load(pack_folder)
+    assert not pack.default_chapters and [chapter.lesson for chapter in pack.chapters] == [2]
+
+
 def test_refuses_a_folder_without_language_db(tmp_path):
     with pytest.raises(PackError, match="no language.db"):
         load(tmp_path)
