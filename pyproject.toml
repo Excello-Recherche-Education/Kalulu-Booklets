@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kalulu-booklets"
+version = "0.1.0"
+description = "Generates the Kalulu reading booklets, as PDF, from the language packs."
+readme = "README.md"
+license = "CC-BY-SA-4.0"
+requires-python = ">=3.11"
+dependencies = [
+    # PDF output, with the fonts embedded.
+    "reportlab>=5.0",
+    # Text shaping: Marelle joins its cursive letters through OpenType rules,
+    # which only a shaping engine applies.
+    "uharfbuzz>=0.40",
+    # Reads the fonts, and converts Kalulu's CFF Mulish to the TrueType
+    # outlines ReportLab embeds.
+    "fonttools>=4.40",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+kalulu-booklets = "kalulu_booklets.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
