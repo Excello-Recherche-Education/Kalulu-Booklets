@@ -32,6 +32,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import uharfbuzz as hb
+from fontTools.pens.boundsPen import BoundsPen
 from fontTools.pens.cu2quPen import Cu2QuPen
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.ttLib import TTFont as FontFile
@@ -107,9 +108,15 @@ class Face:
         # alternates shaping substitutes), under private-use characters.
         self._ttf.hbFont()
         self._hb = hb.Font(hb.Face(hb.Blob(data)))
+        self._glyph_names = info.getGlyphOrder()
+        self._glyph_set = info.getGlyphSet()
 
     @lru_cache(maxsize=None)
     def shape(self, text: str) -> tuple[Glyph, ...]:
+        # HarfBuzz gives no positions at all for an empty text: a table row's
+        # empty right cell is one.
+        if not text:
+            return ()
         buffer = hb.Buffer()
         buffer.add_codepoints([ord(character) for character in text])
         buffer.guess_segment_properties()
@@ -124,6 +131,24 @@ class Face:
                                 position.x_advance / self.units))
             x += position.x_advance
         return tuple(glyphs)
+
+    @lru_cache(maxsize=None)
+    def ink(self, text: str) -> tuple[float, float]:
+        """How far the drawn letters of ``text`` reach above and below the
+        baseline, in em, accents and loops included: (top, bottom), bottom
+        negative below the baseline."""
+        info = hb.Buffer()
+        info.add_codepoints([ord(character) for character in text])
+        info.guess_segment_properties()
+        hb.shape(self._hb, info)
+        top, bottom = 0.0, 0.0
+        for glyph, position in zip(info.glyph_infos or (), info.glyph_positions or ()):
+            pen = BoundsPen(self._glyph_set)
+            self._glyph_set[self._glyph_names[glyph.codepoint]].draw(pen)
+            if pen.bounds:
+                top = max(top, (pen.bounds[3] + position.y_offset) / self.units)
+                bottom = min(bottom, (pen.bounds[1] + position.y_offset) / self.units)
+        return top, bottom
 
     def width(self, text: str, size: float) -> float:
         return sum(glyph.advance for glyph in self.shape(text)) * size

@@ -12,9 +12,11 @@ educational app that helps children learn to read through the decoding
 
 > **Status: first version.** The generator writes the base booklet of every
 > booklet number a pack defines. The teacher's booklet, the booklet without
-> writing pages and the printing imposition are still to come, and so are the
-> covers' artwork and the illustrations (the penguin of the tables, the parrot
-> and stopwatches of the fluency tests).
+> writing pages and the printing imposition are still to come, and so is the
+> covers' artwork. The pages carry the game's characters: the parakeet under the
+> fluency test's speech bubble, beside two stopwatches, the penguin above the
+> tables and the caterpillar on the writing pages (`src/kalulu_booklets/art/`,
+> whose `LICENSE.md` says where each comes from).
 
 ## What it produces
 

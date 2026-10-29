@@ -29,5 +29,8 @@ kalulu-booklets = "kalulu_booklets.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+kalulu_booklets = ["art/*.png", "art/*.md"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
