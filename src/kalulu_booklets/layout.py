@@ -51,6 +51,7 @@ GAP = 7 * mm  # between the blocks of a page
 
 TITLE_SIZES = {1: 40, 2: 32, 3: 26}  # by the number of lines
 TITLE_LEADING = 1.25
+TITLE_LINE_GAP = 0.15  # the least room between two title lines' ink, in em
 
 SYLLABLE_SIZE = 22
 SYLLABLE_ROW = 11 * mm
@@ -189,20 +190,29 @@ class Layout:
         size = TITLE_SIZES.get(len(lines), 22)
         for line in lines:
             size = min(size, _fit(bold, line, half), _fit(cursive, line, half) if with_cursive else size)
-        # Marelle's capitals stand far taller than Mulish's: the first line is
-        # placed by whichever is taller, so neither reaches into the margin.
-        cap = max(bold.cap_height, cursive.cap_height if with_cursive else 0)
-        top = self.y
+        # Each line is placed by the ink of both columns, accents and loops
+        # included: Marelle's capitals stand far taller than Mulish's, and an
+        # accented one ("À") taller still, so a spacing by the size alone made
+        # the cursive lines run into each other.
+        faces = [bold, cursive] if with_cursive else [bold]
+        tops = [max(face.ink(line)[0] for face in faces) * size for line in lines]
+        bottoms = [min(face.ink(line)[1] for face in faces) * size for line in lines]
+        baselines = [self.y - tops[0]] if lines else []
+        for index in range(1, len(lines)):
+            step = max(size * TITLE_LEADING, -bottoms[index - 1] + tops[index] + TITLE_LINE_GAP * size)
+            baselines.append(baselines[-1] - step)
 
         def draw(canvas: Canvas) -> None:
-            for index, line in enumerate(lines):
-                baseline = top - cap * size - index * size * TITLE_LEADING
+            for line, baseline in zip(lines, baselines):
                 bold.draw(canvas, LEFT, baseline, line, size, INK)
                 if with_cursive:
                     cursive.draw(canvas, RIGHT - cursive.width(line, size), baseline, line, size, INK)
 
         self.add(draw)
-        self.y -= cap * size + (len(lines) - 1) * size * TITLE_LEADING + GAP
+        if lines:
+            self.y = baselines[-1] + bottoms[-1] - GAP
+        else:
+            self.y -= GAP
 
     def grid(self, content: ChapterContent, items: list[Styled], columns: int, size: float, row: float) -> None:
         columns = max(1, min(columns, len(items)))

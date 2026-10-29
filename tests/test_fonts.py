@@ -68,3 +68,13 @@ def test_a_letter_a_font_lacks_is_noted_but_one_it_composes_is_not():
 def test_an_empty_text_has_no_glyphs():
     faces = fonts.load(pinned_or_skip())
     assert faces.script.shape("") == () and faces.script.width("", 12) == 0
+
+
+def test_ink_reaches_the_accents():
+    faces = fonts.load(pinned_or_skip())
+    # An accented capital reaches higher than the capital alone, in both faces,
+    # and Marelle's capitals higher than Mulish's: what title lines are spaced by.
+    for face in (faces.script_bold, faces.cursive):
+        assert face.ink("À")[0] > face.ink("A")[0] > 0
+    assert faces.cursive.ink("A")[0] > faces.script_bold.ink("A")[0]
+    assert faces.cursive.ink("g")[1] < 0
