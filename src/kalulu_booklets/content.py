@@ -166,7 +166,7 @@ def _picked(pack: Pack, chapter: Chapter, part: int, count: int, notes: list[str
                      f"the last {len(listed) - count} are left out")
         return listed[:count]
     # A pick printed "la Lune" is the pack's "lune": it is not filled in twice.
-    picked = {word for entry in entries for word in words_of(entry.text)}
+    picked = {word for entry in entries for word in words_of(entry.text, pack.words_by_text)}
     items = pack.syllables if part == packs.SYLLABLES else pack.words
     filling = [_styled_item(pack, item, chapter.grey_silent)
                for item in _automatic(pack, items, chapter) if lower(item.text) not in picked]
@@ -313,7 +313,7 @@ def styled(pack: Pack, text: str, grey: bool, linked: tuple[int, ...] = (),
         return Styled(text)
     silent: set[int] = set()
     next_linked = 0
-    for start, end in word_spans(text):
+    for start, end in word_spans(text, pack.words_by_text):
         word = lower(text[start:end])
         item = None
         if next_linked < len(linked) and linked[next_linked] in pack.words \
@@ -346,10 +346,13 @@ def _by_spelling(pack: Pack, word: str, syllables_too: bool) -> Item | None:
 
 def _silent_offsets(pack: Pack, item: Item, spelling: str) -> list[int]:
     """Positions in ``spelling`` of the letters ``item``'s silent GPs spell, or
-    none when its GPs do not spell it exactly."""
+    none when its GPs do not spell it exactly. A hyphen between two of them is
+    no GP: "tam-tam" is t-a-m-t-a-m."""
     offsets: list[int] = []
     position = 0
-    for gp_id in item.gp_ids:
+    for index, gp_id in enumerate(item.gp_ids):
+        if index and spelling[position:position + 1] == "-":
+            position += 1
         gp = pack.gps.get(gp_id)
         if gp is None:
             return []

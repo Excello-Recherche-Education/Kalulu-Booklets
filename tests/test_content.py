@@ -77,6 +77,17 @@ def test_a_word_in_no_list_is_printed_without_grey(pack_folder):
     assert content.styled(load(pack_folder), "Léo", grey=True).grey == frozenset()
 
 
+def test_a_hyphenated_word_is_its_own_or_its_parts(pack_folder):
+    execute(pack_folder, "INSERT INTO Words (ID, Word, BookletOnly) VALUES (8, 'la-lune', 1)")
+    for position, gp_id in enumerate([2, 1, 2, 3, 4, 5]):
+        execute(pack_folder, "INSERT INTO GPsInWords (WordID, GPID, Position) VALUES (8, ?, ?)", gp_id, position)
+    pack = load(pack_folder)
+    # The word's GPs spell it once its hyphen is skipped: its silent e is grey.
+    assert content.styled(pack, "La-lune", grey=True).grey == {6}
+    # "une-lune" is no word, so it is "une" and "lune", each with its silent e.
+    assert content.styled(pack, "une-lune", grey=True).grey == {2, 7}
+
+
 def test_capitals_are_spread_evenly(pack_folder):
     _, chapter = chapter_content(pack_folder, SyllableCount=8, UppercaseProportion=0.25)
     assert [item.text.isupper() for item in chapter.syllables] == [False, False, False, True] * 2
