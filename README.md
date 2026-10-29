@@ -42,9 +42,8 @@ git submodule:
 Each pack's `language.db` (SQLite) is the single source of truth for the
 progression: the numbered lessons, the grapheme–phoneme correspondences each
 lesson introduces, and the words, syllables and sentences that become readable
-along the way. The CSV exports next to it (`gp_list.csv`, `words_list.csv`,
-`syllables_list.csv`, `sentences_list.csv`) carry the same data in flat form.
-The database structure is documented in the packs' own
+along the way, and the booklets' own content. The generator reads nothing else
+from a pack, apart from the fonts beside the packs. The database structure is documented in the packs' own
 [SCHEMA.md](https://github.com/Excello-Recherche-Education/Kalulu-Languages/blob/main/SCHEMA.md).
 
 Because the booklets and the app read the same pack, a change to a language
