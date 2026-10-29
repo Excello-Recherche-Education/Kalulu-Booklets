@@ -91,3 +91,9 @@ def execute(pack: Path, sql: str, *parameters: object) -> None:
 @pytest.fixture
 def pack_folder(tmp_path: Path) -> Path:
     return make_pack(tmp_path)
+
+
+def own(chapters):
+    """The chapters a test wrote, without the forced ones made for the lessons
+    it left without (negative IDs): ``pack.chapters`` or a booklet's chapters."""
+    return [chapter for chapter in chapters if getattr(chapter, "chapter", chapter).id > 0]

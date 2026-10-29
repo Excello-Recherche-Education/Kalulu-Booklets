@@ -157,9 +157,9 @@ class Pack:
     syllables_by_text: dict[str, list[int]]
     # Role (FONT_COLUMNS) -> the font replacing its default, for those replaced.
     fonts: dict[str, BookletFont] = field(default_factory=dict)
-    # True when BookletChapters is empty and the chapters are the default ones,
-    # one per lesson (default_chapters()).
-    default_chapters: bool = False
+    # The lessons that had no chapter, whose forced chapter is made here
+    # (default_chapters()): every one of them for a pack with no chapter.
+    made_chapters_for: list[int] = field(default_factory=list)
 
     @property
     def cursive(self) -> bool:
@@ -252,32 +252,37 @@ def _load(db: sqlite3.Connection, path: Path) -> Pack:
         if row["ChapterID"] in chapters:
             chapters[row["ChapterID"]].stories.append(Story(row["Title"], row["Text"]))
 
-    made = not chapters
-    if made:
-        lesson_gps: dict[int, list[int]] = {}
-        for row in db.execute("SELECT LessonID, GPID FROM GPsInLessons ORDER BY ID"):
-            lesson_gps.setdefault(row["LessonID"], []).append(row["GPID"])
-        chapters = {chapter.id: chapter for chapter in default_chapters(lesson_numbers, lesson_gps, gps)}
+    lesson_gps: dict[int, list[int]] = {}
+    for row in db.execute("SELECT LessonID, GPID FROM GPsInLessons ORDER BY ID"):
+        lesson_gps.setdefault(row["LessonID"], []).append(row["GPID"])
+    made = default_chapters(lesson_numbers, lesson_gps, gps, list(chapters.values()))
+    chapters.update({chapter.id: chapter for chapter in made})
 
     return Pack(
         locale=path.parent.name, path=path, gps=gps, words=words, syllables=syllables,
         sentences=sentences, settings=settings,
         chapters=sorted(chapters.values(), key=lambda chapter: (chapter.lesson, chapter.position, chapter.id)),
         words_by_text=_by_text(words), syllables_by_text=_by_text(syllables), fonts=fonts,
-        default_chapters=made)
+        made_chapters_for=[chapter.lesson for chapter in made])
 
 
 def default_chapters(lesson_numbers: dict[int, int], lesson_gps: dict[int, list[int]],
-                     gps: dict[int, GP]) -> list[Chapter]:
-    """The chapters of a pack that has none: one per lesson, as the Prof Tool's
-    Booklets screen makes them (BookletData.add_default_chapters()), with the
-    lesson's GPs, a title made of them, booklet 1 and the language's settings.
-    Their IDs are negative, which no row has. The teacher's picture is left out:
-    the teacher's booklet is not printed yet."""
-    chapters = []
+                     gps: dict[int, GP], existing: list[Chapter] = ()) -> list[Chapter]:
+    """The forced chapters of the lessons ``existing`` has none for: every lesson
+    has one, its first chapter. Made as the Prof Tool's Booklets screen makes them
+    (BookletData.add_missing_chapters()), in the lessons' order: the lesson's GPs,
+    a title made of them, the language's settings, and the booklet of the last
+    chapter at or before that lesson (1 when there is none). Their IDs are
+    negative, which no row has. The teacher's picture is left out: the teacher's
+    booklet is not printed yet."""
+    have = {chapter.lesson for chapter in existing}
+    chapters: list[Chapter] = []
     for lesson_id, number in sorted(lesson_numbers.items(), key=lambda pair: pair[1]):
+        if number in have:
+            continue
         gp_ids = list(dict.fromkeys(lesson_gps.get(lesson_id, [])))
-        chapters.append(Chapter(id=-number, lesson=number, position=0, booklet=1, title=title_for(gp_ids, gps),
+        booklet = max([chapter.booklet for chapter in list(existing) + chapters if chapter.lesson <= number], default=1)
+        chapters.append(Chapter(id=-number, lesson=number, position=0, booklet=booklet, title=title_for(gp_ids, gps),
                                 image_gp_id=None, grey_silent=False, overrides={}, gp_ids=gp_ids))
     return chapters
 

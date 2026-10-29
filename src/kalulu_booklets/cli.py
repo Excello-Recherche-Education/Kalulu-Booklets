@@ -46,8 +46,11 @@ def main(argv: list[str] | None = None) -> int:
     if not numbers:
         print(f"{pack.path}: no lesson, so no booklet chapter", file=sys.stderr)
         return 1
-    if pack.default_chapters:
+    if pack.made_chapters_for and not any(chapter.id > 0 for chapter in pack.chapters):
         print(f"{pack.locale} has no booklet chapter: one per lesson, from its GPs, all in booklet 1")
+    elif pack.made_chapters_for:
+        print(f"{pack.locale}: lesson(s) {', '.join(map(str, pack.made_chapters_for))} have no chapter: "
+              "each gets one from its GPs")
     missing = [number for number in numbers if number not in pack.booklets()]
     if missing:
         print(f"error: {pack.locale} has no booklet {', '.join(map(str, missing))}; "
