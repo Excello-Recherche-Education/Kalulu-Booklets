@@ -63,3 +63,8 @@ def test_a_letter_a_font_lacks_is_noted_but_one_it_composes_is_not():
     assert faces.script_black.missing == {"ŋ"}
     notes = fonts.missing_notes(faces, {"script_black": "Loops"})
     assert notes == ["the black script font, Loops (fonts/marelle/Marelle2-Regular.ttf), has no ŋ: printed as an empty box"]
+
+
+def test_an_empty_text_has_no_glyphs():
+    faces = fonts.load(pinned_or_skip())
+    assert faces.script.shape("") == () and faces.script.width("", 12) == 0

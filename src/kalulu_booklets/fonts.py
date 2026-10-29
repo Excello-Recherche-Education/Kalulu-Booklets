@@ -110,6 +110,10 @@ class Face:
 
     @lru_cache(maxsize=None)
     def shape(self, text: str) -> tuple[Glyph, ...]:
+        # HarfBuzz gives no positions at all for an empty text: a table row's
+        # empty right cell is one.
+        if not text:
+            return ()
         buffer = hb.Buffer()
         buffer.add_codepoints([ord(character) for character in text])
         buffer.guess_segment_properties()
