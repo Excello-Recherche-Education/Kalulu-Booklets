@@ -20,6 +20,7 @@ from typing import Callable
 from reportlab.lib.colors import HexColor, black, white
 from reportlab.lib.pagesizes import A5
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen.canvas import Canvas
 
 from kalulu_booklets.content import CURSIVE, Booklet, ChapterContent, Paragraph, Styled, TableRow
@@ -40,8 +41,8 @@ SILENT = HexColor("#9b9b9b")  # silent letters
 TRACE = HexColor("#c9c9c9")  # writing copies to trace over
 FOLIO = HexColor("#7a7a7a")  # page numbers
 TABLE_RULE = HexColor("#8a8a8a")
-BUBBLE = HexColor("#eef3fb")
-BUBBLE_EDGE = HexColor("#9db4dc")
+BUBBLE = white  # the fluency bubble, white and outlined in black as in the printed booklets
+BUBBLE_EDGE = black
 STAR = HexColor("#f6c12e")
 SEYES_MAIN = HexColor("#9488d4")
 SEYES_FINE = HexColor("#d3cdef")
@@ -74,7 +75,8 @@ STORY_LEADING = 1.5
 
 FLUENCY_SIZE = 15
 FLUENCY_COLUMNS = 5
-FLUENCY_ROW = 9 * mm
+FLUENCY_ROW = 9 * mm  # at least; rows stretch to fill the page, up to FLUENCY_ROW_MOST
+FLUENCY_ROW_MOST = 12 * mm
 FLUENCY_PADDING = 5 * mm
 
 # Seyès ruling: a thick line every four fine intervals. Lowercase letters are
@@ -86,6 +88,15 @@ COPY_GAP = 8 * mm
 
 FOLIO_SIZE = 9
 FOLIO_Y = 9 * mm
+
+# The game's characters (art/LICENSE.md): the parakeet under the fluency test's
+# bubble, the penguin above the tables, the caterpillar on the writing pages.
+ART = Path(__file__).parent / "art"
+PARAKEET_HEIGHT = 24 * mm
+PENGUIN_HEIGHT = 12 * mm
+CATERPILLAR_HEIGHT = 9 * mm
+BUBBLE_TAIL = 8 * mm  # how far the fluency bubble's tail reaches down
+STOPWATCH = 5 * mm
 
 Draw = Callable[[Canvas], None]
 
@@ -173,8 +184,8 @@ class Layout:
             self.sentences(content)
         elif content.sentence_pool:
             self.chosen_sentences(content)
-        for table in content.tables:
-            self.table(table)
+        for index, table in enumerate(content.tables):
+            self.table(table, with_penguin=index == 0)
         for title, paragraphs in content.stories:
             self.story(content, title, paragraphs)
         if content.writing and content.writing_models + content.writing_tracings > 0:
@@ -305,10 +316,15 @@ class Layout:
             top_of_page = False
         self.y -= GAP
 
-    def table(self, rows: list[TableRow]) -> None:
+    def table(self, rows: list[TableRow], with_penguin: bool = False) -> None:
         height = len(rows) * TABLE_ROW
-        if height > self.room():
+        penguin = PENGUIN_HEIGHT + GAP / 2 if with_penguin else 0
+        if height + penguin > self.room():
             self.new_page()
+        if with_penguin:
+            top_of_art = self.y
+            self.add(lambda canvas: _picture(canvas, "penguin", PAGE_WIDTH / 2, top_of_art, PENGUIN_HEIGHT, centered=True))
+            self.y -= penguin
         regular, bold = self.fonts.script, self.fonts.script_bold
         left = LEFT + (WIDTH - TABLE_WIDTH) / 2
         column = TABLE_WIDTH / 2
@@ -380,30 +396,38 @@ class Layout:
             self.add(lambda canvas, page_lines=page_lines: _seyes(canvas, face, size, page_lines))
 
     def fluency(self, items: list[Styled]) -> None:
+        """A speech bubble the parakeet says, with two stopwatches beside it:
+        the child reads the bubble aloud against the clock."""
         face = self.fonts.script
-        per_page = int((TOP - BOTTOM - 2 * FLUENCY_PADDING) // FLUENCY_ROW) * FLUENCY_COLUMNS
+        below = BUBBLE_TAIL + PARAKEET_HEIGHT
+        per_page = int((TOP - BOTTOM - below - 2 * FLUENCY_PADDING) // FLUENCY_ROW) * FLUENCY_COLUMNS
         for start in range(0, len(items), per_page):
             self.new_page()
             chunk = items[start:start + per_page]
             rows = math.ceil(len(chunk) / FLUENCY_COLUMNS)
-            height = rows * FLUENCY_ROW + 2 * FLUENCY_PADDING
+            # The bubble takes the page down to the parakeet, as the printed
+            # booklets have it, its rows no further apart than FLUENCY_ROW_MOST.
+            row_height = min(FLUENCY_ROW_MOST, (self.room() - below - 2 * FLUENCY_PADDING) / rows)
+            height = rows * row_height + 2 * FLUENCY_PADDING
             top = self.y
 
-            def draw(canvas: Canvas, chunk: list[Styled] = chunk, height: float = height, top: float = top) -> None:
-                canvas.setFillColor(BUBBLE)
-                canvas.setStrokeColor(BUBBLE_EDGE)
-                canvas.setLineWidth(1)
-                canvas.roundRect(LEFT, top - height, WIDTH, height, 6 * mm, stroke=1, fill=1)
+            def draw(canvas: Canvas, chunk: list[Styled] = chunk, height: float = height, top: float = top,
+                     row_height: float = row_height) -> None:
+                bottom = top - height
+                _bubble(canvas, LEFT, bottom, WIDTH, height, 6 * mm, PAGE_WIDTH / 2, BUBBLE_TAIL)
+                _picture(canvas, "parakeet", PAGE_WIDTH / 2, bottom - BUBBLE_TAIL - 1 * mm, PARAKEET_HEIGHT, centered=True)
+                for row in range(2):
+                    _stopwatch(canvas, RIGHT - 18 * mm, bottom - BUBBLE_TAIL - 6 * mm - row * (STOPWATCH + 2 * mm), STOPWATCH)
                 cell = (WIDTH - 2 * FLUENCY_PADDING) / FLUENCY_COLUMNS
                 for index, item in enumerate(chunk):
                     size = min(FLUENCY_SIZE, _fit(face, item.text, cell - 2 * CELL_PADDING))
                     center_x = LEFT + FLUENCY_PADDING + (index % FLUENCY_COLUMNS + 0.5) * cell
-                    center_y = top - FLUENCY_PADDING - (index // FLUENCY_COLUMNS + 0.5) * FLUENCY_ROW
+                    center_y = top - FLUENCY_PADDING - (index // FLUENCY_COLUMNS + 0.5) * row_height
                     face.draw(canvas, center_x - face.width(item.text, size) / 2,
                               center_y - face.x_height * size / 2, item.text, size, INK, item.grey, SILENT)
 
             self.add(draw)
-            self.y -= height + GAP
+            self.y -= height + below + GAP
 
 
 # --- Writing the PDF ---------------------------------------------------------------
@@ -430,6 +454,67 @@ def write(booklet: Booklet, fonts: Fonts, path: Path) -> int:
 
 
 # --- Drawing helpers ---------------------------------------------------------------
+
+def _picture(canvas: Canvas, name: str, x: float, top: float, height: float, centered: bool = False) -> None:
+    """One of the game's characters, ``height`` high, its top at ``top``; ``x``
+    is its left edge, or its middle when ``centered``."""
+    image = _image(name)
+    width = height * image.getSize()[0] / image.getSize()[1]
+    left = x - width / 2 if centered else x
+    canvas.drawImage(image, left, top - height, width, height, mask="auto")
+
+
+_IMAGES: dict[str, ImageReader] = {}
+
+
+def _image(name: str) -> ImageReader:
+    if name not in _IMAGES:
+        _IMAGES[name] = ImageReader(str(ART / f"{name}.png"))
+    return _IMAGES[name]
+
+
+def _bubble(canvas: Canvas, x: float, y: float, width: float, height: float, radius: float,
+            tail_x: float, tail: float) -> None:
+    """A rounded speech bubble whose tail points down at ``tail_x``."""
+    path = canvas.beginPath()
+    half = tail * 0.75
+    path.moveTo(x + radius, y)
+    path.lineTo(tail_x - half, y)
+    path.lineTo(tail_x, y - tail)
+    path.lineTo(tail_x + half, y)
+    path.lineTo(x + width - radius, y)
+    path.arcTo(x + width - 2 * radius, y, x + width, y + 2 * radius, startAng=-90, extent=90)
+    path.lineTo(x + width, y + height - radius)
+    path.arcTo(x + width - 2 * radius, y + height - 2 * radius, x + width, y + height, startAng=0, extent=90)
+    path.lineTo(x + radius, y + height)
+    path.arcTo(x, y + height - 2 * radius, x + 2 * radius, y + height, startAng=90, extent=90)
+    path.lineTo(x, y + radius)
+    path.arcTo(x, y, x + 2 * radius, y + 2 * radius, startAng=180, extent=90)
+    path.close()
+    canvas.setFillColor(BUBBLE)
+    canvas.setStrokeColor(BUBBLE_EDGE)
+    canvas.setLineWidth(1)
+    canvas.drawPath(path, stroke=1, fill=1)
+
+
+def _stopwatch(canvas: Canvas, x: float, y: float, size: float) -> None:
+    """A stopwatch ``size`` across, its dial centred at (x, y): a ring, the
+    crown on top, the side button and one hand."""
+    radius = size / 2
+    stroke = size * 0.1
+    canvas.setStrokeColor(INK)
+    canvas.setFillColor(INK)
+    canvas.setLineWidth(stroke)
+    canvas.circle(x, y, radius - stroke / 2, stroke=1, fill=0)
+    canvas.rect(x - size * 0.12, y + radius, size * 0.24, size * 0.1, stroke=0, fill=1)
+    canvas.rect(x - size * 0.2, y + radius + size * 0.1, size * 0.4, size * 0.08, stroke=0, fill=1)
+    side = math.radians(45)
+    canvas.line(x + radius * math.cos(side), y + radius * math.sin(side),
+                x + (radius + size * 0.12) * math.cos(side), y + (radius + size * 0.12) * math.sin(side))
+    canvas.setLineWidth(stroke * 0.8)
+    canvas.line(x, y, x + radius * 0.45, y + radius * 0.45)
+    canvas.circle(x, y, stroke * 0.6, stroke=0, fill=1)
+
 
 def _fit(face: Face, text: str, width: float) -> float:
     """The largest size at which ``text`` fits in ``width``."""
@@ -526,6 +611,8 @@ def _seyes(canvas: Canvas, face: Face, size: float, lines: list[list[tuple[float
     canvas.setStrokeColor(SEYES_MARGIN)
     canvas.setLineWidth(0.6)
     canvas.line(SEYES_MARGIN_LINE, top + step / 2, SEYES_MARGIN_LINE, top - SEYES_LINES * step)
+    # The caterpillar, top left, in the room above the ruling.
+    _picture(canvas, "caterpillar", LEFT, top + step / 2 + CATERPILLAR_HEIGHT + 1 * mm, CATERPILLAR_HEIGHT)
     for index, copies in enumerate(lines):
         baseline = top - (index + 1) * step
         for x, text, color in copies:
