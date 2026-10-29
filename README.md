@@ -134,10 +134,12 @@ The content of the booklets is edited in the **Booklets** tab of the
 stored in the pack's `Booklet*` tables: see "The reading booklets" in the packs'
 `SCHEMA.md`. In short:
 
-- **chapters follow the app's lessons**, and say which booklet they are in. A
-  pack with no chapter yet gets one per lesson, all in booklet 1: each with the
-  lesson's graphemes, a title made of them ("L l") and the language's settings,
-  as the Prof Tool makes them when it opens such a pack;
+- **chapters follow the app's lessons**, and say which booklet they are in.
+  Every lesson has one, its first chapter; the chapters after it are optional
+  ones, printed before the next lesson's. A lesson without a chapter gets its
+  own: the lesson's graphemes, a title made of them ("L l"), the language's
+  settings and the booklet of the chapter before it (booklet 1 for a pack with no
+  chapter yet), as the Prof Tool makes it when it opens such a pack;
 - each chapter page has its title (script on the left, cursive on the right), its
   syllables and words, then its sentences, in paragraphs that alternate script
   and cursive;

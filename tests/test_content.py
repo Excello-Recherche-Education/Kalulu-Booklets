@@ -1,4 +1,4 @@
-from conftest import add_chapter, execute
+from conftest import add_chapter, execute, own
 from kalulu_booklets import content
 from kalulu_booklets.content import CURSIVE, SCRIPT
 from kalulu_booklets.pack import load
@@ -7,7 +7,8 @@ from kalulu_booklets.pack import load
 def chapter_content(pack_folder, **columns):
     add_chapter(pack_folder, 3, [3, 4, 5], **columns)
     booklet = content.booklet(load(pack_folder), 1)
-    return booklet, booklet.chapters[0] if booklet.chapters else None
+    chapters = own(booklet.chapters)
+    return booklet, chapters[0] if chapters else None
 
 
 def texts(items):
@@ -42,7 +43,7 @@ def test_picks_past_the_count_lose_the_last_ones(pack_folder):
     chapter_id = add_chapter(pack_folder, 3, [3], WordCount=1)
     add_entries(pack_folder, chapter_id, 2, ["la Lune", "une lune"])
     booklet = content.booklet(load(pack_folder), 1)
-    assert texts(booklet.chapters[0].words) == ["la Lune"]
+    assert texts(own(booklet.chapters)[0].words) == ["la Lune"]
     assert "Lesson 3, chapter 1: 2 words picked and WordCount is 1: the last 1 are left out" in booklet.notes
 
 
@@ -50,7 +51,7 @@ def test_picks_short_of_the_count_are_filled_from_the_pack(pack_folder):
     chapter_id = add_chapter(pack_folder, 3, [3], WordCount=3, SyllableCount=3)
     add_entries(pack_folder, chapter_id, 2, ["la Lune"])
     add_entries(pack_folder, chapter_id, 1, ["un"])
-    chapter = content.booklet(load(pack_folder), 1).chapters[0]
+    chapter = own(content.booklet(load(pack_folder), 1).chapters)[0]
     # "lune" is already printed, as "la Lune": the fill skips it.
     assert texts(chapter.words) == ["la Lune", "Luna", "une"]
     assert texts(chapter.syllables) == ["un", "nu", "lu"]
@@ -102,7 +103,7 @@ def add_sentences(pack_folder, chapter_id, breaks):
 def test_breaks_make_lines_and_paragraphs(pack_folder):
     chapter_id = add_chapter(pack_folder, 3, [3])
     add_sentences(pack_folder, chapter_id, [2, 0, 1, 2])
-    chapter = content.booklet(load(pack_folder), 1).chapters[0]
+    chapter = own(content.booklet(load(pack_folder), 1).chapters)[0]
     assert [[texts(line) for line in paragraph.lines] for paragraph in chapter.paragraphs] == [
         [["La lune.", "Une lune nue."], ["La lune."]],
         [["Une lune nue."]],
@@ -114,7 +115,7 @@ def test_a_language_without_cursive_prints_sentences_in_script(pack_folder):
     execute(pack_folder, "UPDATE BookletSettings SET Cursive = 0")
     chapter_id = add_chapter(pack_folder, 3, [3], SentenceFont=2)
     add_sentences(pack_folder, chapter_id, [2, 2])
-    chapter = content.booklet(load(pack_folder), 1).chapters[0]
+    chapter = own(content.booklet(load(pack_folder), 1).chapters)[0]
     assert [paragraph.font for paragraph in chapter.paragraphs] == [SCRIPT, SCRIPT]
     assert chapter.writing_font == SCRIPT
 
@@ -122,7 +123,7 @@ def test_a_language_without_cursive_prints_sentences_in_script(pack_folder):
 def test_a_sentence_keeps_its_own_words_for_grey(pack_folder):
     chapter_id = add_chapter(pack_folder, 3, [3], GreySilent=1)
     add_sentences(pack_folder, chapter_id, [2, 0])
-    chapter = content.booklet(load(pack_folder), 1).chapters[0]
+    chapter = own(content.booklet(load(pack_folder), 1).chapters)[0]
     first, second = chapter.paragraphs[0].lines[0]
     assert first.grey == {6}  # "La lun|e|."
     assert second.grey == {2, 7}  # "Un|e| lun|e| nue." -- "nue" is in no list
@@ -131,7 +132,9 @@ def test_a_sentence_keeps_its_own_words_for_grey(pack_folder):
 def test_a_chapter_that_prints_nothing_is_left_out_and_said(pack_folder):
     booklet, chapter = chapter_content(pack_folder, SyllableCount=0, WordCount=0, SentencePages=-1)
     assert chapter is None
-    assert booklet.notes == ["Lesson 3, chapter 1: prints nothing, so it has no page"]
+    # Lessons 1 and 2 have their forced chapters made, which print.
+    assert [note for note in booklet.notes if note.startswith("Lesson 3")] == [
+        "Lesson 3, chapter 1: prints nothing, so it has no page"]
 
 
 def test_a_sentence_read_only_later_is_said(pack_folder):
@@ -145,7 +148,7 @@ def test_sentence_pages_minus_one_prints_no_sentence(pack_folder):
     chapter_id = add_chapter(pack_folder, 3, [3], SentencePages=-1)
     add_sentences(pack_folder, chapter_id, [2, 2])
     booklet = content.booklet(load(pack_folder), 1)
-    assert booklet.chapters[0].paragraphs == []
+    assert own(booklet.chapters)[0].paragraphs == []
     assert "Lesson 3, chapter 1: SentencePages is -1, so its 2 sentence(s) are not printed" in booklet.notes
 
 
@@ -166,12 +169,12 @@ def test_sentences_holding_the_chapter_gps_come_before_the_others(pack_folder):
     for position in range(2):
         execute(pack_folder, "INSERT INTO WordsInSentences (SentenceID, WordID, Position) VALUES (3, 1, ?)", position)
     add_chapter(pack_folder, 3, [3], SyllableCount=0, WordCount=0)  # teaches "u": "La la." has none
-    chapter = content.booklet(load(pack_folder), 1).chapters[0]
+    chapter = own(content.booklet(load(pack_folder), 1).chapters)[0]
     assert [sentence_id for sentence_id, _ in chapter.sentence_pool] == [1, 2, 3]
 
 
 def test_a_chapter_its_lesson_reads_no_sentence_of_says_so(pack_folder):
     add_chapter(pack_folder, 2, [2], Title="L l")  # "La lune." is only readable at lesson 3
     booklet = content.booklet(load(pack_folder), 1)
-    assert booklet.chapters[0].sentence_pool == []
+    assert own(booklet.chapters)[0].sentence_pool == []
     assert "Lesson 2, chapter 1: no sentence is readable at this lesson" in booklet.notes

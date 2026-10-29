@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from conftest import add_chapter, execute
+from conftest import add_chapter, execute, own
 from kalulu_booklets import content, fonts, layout
 from kalulu_booklets.cli import main
 from kalulu_booklets.pack import load
@@ -70,7 +70,7 @@ def test_chosen_sentences_are_whole_and_one_that_overflows_is_passed_over(pack_f
                 [4, 2][position % 2], position)
     add_chapter(pack_folder, 3, [3], SentencePages=0)
     booklet = content.booklet(load(pack_folder), 1)
-    chapter = booklet.chapters[0]
+    chapter = own(booklet.chapters)[0]
     chapter.sentence_pool.sort(key=lambda candidate: candidate[0] != 3)  # the long one first
     pages = layout.Layout(booklet, fonts.load(fonts.PINNED))
     pages.new_page()
