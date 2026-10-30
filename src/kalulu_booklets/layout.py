@@ -305,8 +305,11 @@ class Layout:
         """A chapter that picks no sentence: as many of its pool as fit on the
         page they start on and on ``sentence_pages`` more, each whole. One that
         would run onto the next page is passed over for a later one that fits;
-        one already printed in this booklet comes after the others."""
+        one already printed in this booklet comes after the others. When too few
+        of the pool hold one of the chapter's GPs to fill its pages, the others,
+        earlier lessons' content, are printed too, and the build says so."""
         pool = sorted(content.sentence_pool, key=lambda candidate: candidate[0] in self.printed_sentences)
+        printed: list[int] = []
         extra = 0
         placed = 0
         top_of_page = False
@@ -340,9 +343,19 @@ class Layout:
                 self.add(_line_step(face, line, baseline, size))
                 self.y -= leading
             self.printed_sentences.add(sentence_id)
+            printed.append(sentence_id)
             pool.pop(index)
             placed += 1
             top_of_page = False
+        earlier = [sentence_id for sentence_id in printed if sentence_id not in content.sentences_teaching]
+        if earlier:
+            own = len(content.sentences_teaching)
+            readable = ("no readable sentence holds one" if not own else
+                        "only 1 readable sentence holds one" if own == 1 else
+                        f"only {own} readable sentences hold one")
+            self.note(content, f"not enough content of its own: {len(earlier)} of its {len(printed)} sentences "
+                               f"{'holds' if len(earlier) == 1 else 'hold'} none of its GPs, taken from earlier "
+                               f"lessons to fill its pages ({readable})")
         self.y -= GAP
 
     def table(self, content: ChapterContent, rows: list[TableRow], with_penguin: bool = False) -> None:
