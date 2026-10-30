@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from kalulu_booklets import pack as packs
 from kalulu_booklets.pack import Chapter, Item, Pack
@@ -84,6 +85,9 @@ class ChapterContent:
     # The pool's sentences that hold one of the chapter's GPs: the others are
     # earlier lessons' content, taken only to fill the pages.
     sentences_teaching: frozenset[int] = frozenset()
+    # The Look & Learn image of the chapter's ImageGPID, for the teacher's page;
+    # None when it has none, or the pack's images are not checked out.
+    picture: Path | None = None
 
     def is_empty(self) -> bool:
         return not (self.title or self.syllables or self.words or self.paragraphs or self.sentence_pool
@@ -151,6 +155,7 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
         stories=[(story.title.strip(), [styled(pack, paragraph, grey) for paragraph in _story_paragraphs(story.text)])
                  for story in chapter.stories],
         sentences_teaching=frozenset(teaching),
+        picture=pack.picture(chapter.image_gp_id),
     )
 
 
