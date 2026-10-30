@@ -1,7 +1,10 @@
 name: Release Booklets
 
 # Builds the booklets of every language pack and publishes them, all in one
-# GitHub release. Run by hand: Actions -> Release Booklets -> Run workflow.
+# GitHub release, as one zip per language: Kalulu-Booklets-<locale>.zip holds a
+# folder of that language's PDFs (and, once there are booklet options, a
+# subfolder per option, as the generator writes them) and its build notes.
+# Run by hand: Actions -> Release Booklets -> Run workflow.
 #
 # The booklets are never committed (build/ is ignored): this release is where
 # they are downloaded from. Nothing is published unless every pack builds, so a
@@ -64,7 +67,6 @@ jobs:
         id: build
         run: |
           mkdir -p dist build
-          : > dist/build-notes.txt
           locales=""
           failed=""
           # Every locale folder (xx_XX) with a language.db: fonts/ and schema/
@@ -77,7 +79,6 @@ jobs:
             kalulu-booklets build "$locale" --out build > "build/$locale.log" 2>&1 || failed="$failed $locale"
             cat "build/$locale.log"
             echo "::endgroup::"
-            { echo "== $locale"; cat "build/$locale.log"; echo; } >> dist/build-notes.txt
           done
           if [[ -z "$locales" ]]; then
             echo "::error::no language pack found in kalulu-languages/"
@@ -87,8 +88,15 @@ jobs:
             echo "::error::the booklets of$failed could not be built; nothing is published"
             exit 1
           fi
+          # A release lists its files flat, so each language is one zip, with a
+          # folder inside: everything the generator wrote for it, plus its notes.
+          mkdir -p stage
           for locale in $locales; do
-            cp "build/$locale/$locale"-booklet-*.pdf dist/
+            folder="Kalulu-Booklets-$locale"
+            mkdir -p "stage/$folder"
+            cp -R "build/$locale/." "stage/$folder/"
+            cp "build/$locale.log" "stage/$folder/build-notes.txt"
+            (cd stage && zip -q -r -X "../dist/$folder.zip" "$folder")
           done
           echo "locales=${locales# }" >> "$GITHUB_OUTPUT"
 
@@ -102,14 +110,14 @@ jobs:
           tag="booklets-$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           {
-            echo "The Kalulu reading booklets of every language pack, as PDF, A5 (148 × 210 mm)."
+            echo "The Kalulu reading booklets of every language pack, as PDF, A5 (148 × 210 mm): one zip per language."
             echo
-            echo "| Language | Booklets | Pages |"
-            echo "|---|---|---|"
+            echo "| Language | Download | Booklets | Pages |"
+            echo "|---|---|---|---|"
             for locale in $LOCALES; do
-              count="$(ls dist/"$locale"-booklet-*.pdf | wc -l | tr -d ' ')"
+              count="$(find "stage/Kalulu-Booklets-$locale" -name '*.pdf' | wc -l | tr -d ' ')"
               pages="$(grep -oE '\(([0-9]+) pages' "build/$locale.log" | grep -oE '[0-9]+' | paste -sd ' ' -)"
-              echo "| \`$locale\` | $count | $pages |"
+              echo "| \`$locale\` | \`Kalulu-Booklets-$locale.zip\` | $count | $pages |"
             done
             echo
             echo "Built from:"
@@ -121,7 +129,7 @@ jobs:
               echo "- Kalulu-Languages ${languages_commit::8}, the commit this repository pins"
             fi
             echo
-            echo "What could not be printed as a pack asks (a word wider than its cell, sentences that do not fit, a letter a font lacks…) is listed in \`build-notes.txt\`."
+            echo "What could not be printed as a pack asks (a word wider than its cell, sentences that do not fit, a letter a font lacks…) is listed in each zip's \`build-notes.txt\`."
           } > release-notes.md
           cat release-notes.md
 
@@ -132,7 +140,7 @@ jobs:
           PRERELEASE: ${{ inputs.prerelease }}
         run: |
           if [[ "$PRERELEASE" == "true" ]]; then flags=(--prerelease --latest=false); else flags=(--latest); fi
-          gh release create "$TAG" dist/*.pdf dist/build-notes.txt \
+          gh release create "$TAG" dist/*.zip \
             --target "$GITHUB_SHA" \
             --title "Kalulu Booklets $(date -u +%Y-%m-%d)" \
             --notes-file release-notes.md \

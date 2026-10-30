@@ -130,8 +130,10 @@ the build.
 **The booklets are never committed**: `build/` is ignored. They are published as
 a release instead, by the **Release Booklets** workflow (Actions → Release
 Booklets → Run workflow). It runs the tests, then builds every language pack in
-`kalulu-languages/`, and publishes all the PDFs in one release, with
-`build-notes.txt` listing what each pack could not print as asked. By default it
+`kalulu-languages/`, and publishes them in one release, **one zip per language**:
+`Kalulu-Booklets-<locale>.zip`. A release lists its files flat, with no folders,
+so the folders are inside each zip: the language's PDFs, as the generator writes
+them, and `build-notes.txt`, listing what that pack could not print as asked. By default it
 builds the packs at the commit this repository pins. *languages_ref* builds from
 another branch, tag or commit of Kalulu-Languages instead, for example `main`.
 If one pack fails to build, nothing is published.
