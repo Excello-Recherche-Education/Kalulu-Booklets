@@ -76,7 +76,10 @@ jobs:
             [[ "$locale" =~ ^[a-z]{2}_[A-Z]{2}$ && -f "$pack/language.db" ]] || continue
             locales="$locales $locale"
             echo "::group::$locale"
-            kalulu-booklets build "$locale" --out build > "build/$locale.log" 2>&1 || failed="$failed $locale"
+            # The folder, not the bare locale: a bare locale is looked up beside
+            # the installed package, which is only this checkout when the
+            # generator is installed in editable mode.
+            kalulu-booklets build "kalulu-languages/$locale" --out build > "build/$locale.log" 2>&1 || failed="$failed $locale"
             cat "build/$locale.log"
             echo "::endgroup::"
           done
