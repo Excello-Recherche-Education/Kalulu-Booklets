@@ -10,10 +10,11 @@ educational app that helps children learn to read through the decoding
 (grapheme–phoneme) method, developed by
 [Excello Recherche & Éducation](https://github.com/Excello-Recherche-Education).
 
-> **Status: first version.** The generator writes the base booklet of every
-> booklet number a pack defines. The teacher's booklet, the booklet without
-> writing pages and the printing imposition are still to come, and so is the
-> covers' artwork. The pages carry the game's characters: the parakeet under the
+> **Status: first version.** The generator writes every booklet a pack
+> defines, in six versions: the base booklet, the teacher's, one without writing
+> pages, and three adapted for pupils with dyslexia, dyspraxia or attention
+> difficulties; the base and no-writing ones also imposed for printing. The
+> covers' artwork is still to come. The pages carry the game's characters: the parakeet under the
 > fluency test's speech bubble, beside two stopwatches, the penguin above the
 > tables and the caterpillar on the writing pages (`src/kalulu_booklets/art/`,
 > whose `LICENSE.md` says where each comes from).
@@ -123,13 +124,18 @@ has just saved to, so a change can be seen before it is committed. The pack is
 only ever read.
 
 Every booklet is written in each of its **versions**, one folder per version under
-`build/<locale>/`. Every version has the same content; only the pages differ:
+`build/<locale>/`. Every version has the same content; only the pages differ (an
+adapted version cuts only the fluency test, and prints the sentences the base
+booklet chose for a chapter that picks none):
 
 | Version | Folder, file | What changes |
 |---|---|---|
 | base | `base/<locale>-booklet-<n>.pdf` | the booklet itself |
 | teacher | `teacher/<locale>-booklet-<n>-teacher.pdf` | before each chapter, a page with its title and its picture (the Look & Learn image the chapter names), under the same page number as the chapter page, so that a teacher's copy and the pupils' agree. "Version enseignant" on the cover |
 | no writing pages | `no-writing/<locale>-booklet-<n>-no-writing.pdf` | without its writing pages |
+| dyslexia | `dyslexia/<locale>-booklet-<n>-dyslexia.pdf` | bigger, airier text: script at 20 pt with letter and word spacing, more space between lines; words in two columns; a chapter over several pages, its sentences on pages of their own; a shorter fluency test (24 items); a writing ruling with wider lines; page numbers bottom right. "Version différenciée" on the cover, and an adaptations page before the back cover saying what changed |
+| dyspraxia | `dyspraxia/<locale>-booklet-<n>-dyspraxia.pdf` | as dyslexia, at 24 pt, words one per line, in script only and with no writing pages; the multi-letter graphemes coloured (the chapter's own orange, earlier ones indigo, dark red where two touch and for "qu") and every silent letter grey |
+| adhd | `adhd/<locale>-booklet-<n>-adhd.pdf` | as dyspraxia, with the cursive and the writing pages kept |
 
 The base and no-writing versions are also written **for printing**, as
 `…-print.pdf`: A4 landscape, two A5 pages a side, in saddle-stitch order (the last
@@ -138,6 +144,8 @@ printed on both sides, folded and stapled, read in order. A booklet printed that
 way has a multiple of four pages, which blank pages before the back cover make up.
 The teacher's pictures need the pack's `look_and_learn/images/`, which are in Git
 LFS: without them, the teacher version has no teacher pages, and the build says so.
+The adaptations page is written in French only so far: in another language the
+adapted versions have none, and the build says so.
 
 Then comes a list of what to look at: what the pack asks for and the
 booklet cannot print, such as a chapter with nothing in it, sentences that do not

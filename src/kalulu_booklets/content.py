@@ -20,15 +20,53 @@ from kalulu_booklets.text import lower, upper, word_spans, words_of
 SCRIPT, CURSIVE = "script", "cursive"
 
 
+# What a multi-letter grapheme is coloured as (Styled.tints), in the versions
+# that colour them (versions.py): one the chapter teaches, one an earlier lesson
+# taught, or one whose colour changes because it touches another coloured one
+# ("chou": ch then ou), so that each stays visible; "qu" always has that colour.
+OWN, EARLIER, TOUCHING = "own", "earlier", "touching"
+
+
 @dataclass(frozen=True)
 class Styled:
-    """Text to print, with the positions of its letters to print in grey."""
+    """Text to print, with what its letters are: the positions to print in grey
+    where the chapter asks for it (``grey``), every silent letter whatever the
+    chapter asks (``silent``), and its multi-letter graphemes, as (start, end,
+    kind) spans (``tints``)."""
 
     text: str
     grey: frozenset[int] = frozenset()
+    silent: frozenset[int] = frozenset()
+    tints: tuple[tuple[int, int, str], ...] = ()
 
     def upper(self) -> Styled:
-        return Styled(upper(self.text), self.grey)
+        return Styled(upper(self.text), self.grey, self.silent, self.tints)
+
+    def slice(self, start: int, end: int) -> Styled:
+        """The characters ``start`` to ``end``, with what is marked among them."""
+        inside = lambda positions: frozenset(index - start for index in positions if start <= index < end)  # noqa: E731
+        return Styled(self.text[start:end], inside(self.grey), inside(self.silent),
+                      tuple((max(begin, start) - start, min(finish, end) - start, kind)
+                            for begin, finish, kind in self.tints if begin < end and finish > start))
+
+    @staticmethod
+    def joined(pieces: list[Styled]) -> Styled:
+        """Pieces one space apart, as sentences sharing a line."""
+        text: list[str] = []
+        grey: set[int] = set()
+        silent: set[int] = set()
+        tints: list[tuple[int, int, str]] = []
+        offset = 0
+        for piece in pieces:
+            if text:
+                text.append(" ")
+                offset += 1
+            text.append(piece.text)
+            grey.update(offset + index for index in piece.grey)
+            silent.update(offset + index for index in piece.silent)
+            tints.extend((offset + begin, offset + end, kind) for begin, end, kind in piece.tints)
+            offset += len(piece.text)
+        return Styled("".join(text), frozenset(grey), frozenset(silent), tuple(tints))
 
     def lines(self) -> list[Styled]:
         """Split at the line breaks a sentence may hold (SCHEMA.md)."""
@@ -37,9 +75,7 @@ class Styled:
         for end in [index for index, character in enumerate(self.text) if character == "\n"] + [len(self.text)]:
             raw = self.text[start:end]
             first = start + len(raw) - len(raw.lstrip())
-            stripped = raw.strip()
-            pieces.append(Styled(stripped, frozenset(index - first for index in self.grey
-                                                     if first <= index < first + len(stripped))))
+            pieces.append(self.slice(first, first + len(raw.strip())))
             start = end + 1
         return pieces
 
@@ -151,8 +187,9 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
         writing_font=CURSIVE if pack.cursive else SCRIPT,
         writing_models=int(setting("WritingModels")),
         writing_tracings=int(setting("WritingTracings")),
-        fluency=[styled(pack, entry.text, grey) for entry in chapter.entries.get(packs.FLUENCY, [])],
-        stories=[(story.title.strip(), [styled(pack, paragraph, grey) for paragraph in _story_paragraphs(story.text)])
+        fluency=[styled(pack, entry.text, grey, chapter=chapter) for entry in chapter.entries.get(packs.FLUENCY, [])],
+        stories=[(story.title.strip(), [styled(pack, paragraph, grey, chapter=chapter)
+                                        for paragraph in _story_paragraphs(story.text)])
                  for story in chapter.stories],
         sentences_teaching=frozenset(teaching),
         picture=pack.picture(chapter.image_gp_id),
@@ -168,7 +205,9 @@ def _picked(pack: Pack, chapter: Chapter, part: int, count: int, notes: list[str
     chosen is repeated until the count is reached."""
     kind, column = ("syllable", "SyllableCount") if part == packs.SYLLABLES else ("word", "WordCount")
     entries = chapter.entries.get(part, [])
-    listed = [styled(pack, entry.text, chapter.grey_silent, syllables_too=part == packs.SYLLABLES)
+    # Syllables are never coloured: only words get their graphemes' colours.
+    tinted = chapter if part == packs.WORDS else None
+    listed = [styled(pack, entry.text, chapter.grey_silent, syllables_too=part == packs.SYLLABLES, chapter=tinted)
               for entry in entries]
     if len(listed) > count:
         notes.append(f"{len(listed)} {kind}s picked and {column} is {count}: "
@@ -177,7 +216,7 @@ def _picked(pack: Pack, chapter: Chapter, part: int, count: int, notes: list[str
     # A pick printed "la Lune" is the pack's "lune": it is not filled in twice.
     picked = {word for entry in entries for word in words_of(entry.text, pack.words_by_text)}
     items = pack.syllables if part == packs.SYLLABLES else pack.words
-    filling = [_styled_item(pack, item, chapter.grey_silent)
+    filling = [_styled_item(pack, item, chapter.grey_silent, tinted)
                for item in _automatic(pack, items, chapter) if lower(item.text) not in picked]
     chosen = listed + filling[:count - len(listed)]
     if count and not chosen:
@@ -235,7 +274,7 @@ def _paragraphs(pack: Pack, chapter: Chapter, grey: bool, uppercase: float,
             notes.append(f"sentence \"{sentence.text}\" is never readable")
         elif lesson > chapter.lesson:
             notes.append(f"sentence \"{sentence.text}\" is readable from lesson {lesson}")
-        text = styled(pack, sentence.text, grey, linked=sentence.word_ids)
+        text = styled(pack, sentence.text, grey, linked=sentence.word_ids, chapter=chapter)
         if int((index + 1) * uppercase) > int(index * uppercase):
             text = text.upper()
         pieces = text.lines()
@@ -265,7 +304,8 @@ def _sentence_pool(pack: Pack, chapter: Chapter, grey: bool) -> tuple[list[tuple
         ranked.append(((not teaches, not sentence.booklet_only, sentence.id), sentence))
     ranked.sort(key=lambda pair: pair[0])
     teaching = {sentence.id for key, sentence in ranked if not key[0]}
-    return [(sentence.id, styled(pack, sentence.text, grey, linked=sentence.word_ids)) for _, sentence in ranked], teaching
+    return [(sentence.id, styled(pack, sentence.text, grey, linked=sentence.word_ids, chapter=chapter))
+            for _, sentence in ranked], teaching
 
 
 def _paragraph_font(pack: Pack, chapter: Chapter, index: int) -> str:
@@ -298,7 +338,8 @@ def _tables(pack: Pack, chapter: Chapter, grey: bool) -> list[list[TableRow]]:
     for entry in chapter.entries.get(packs.TABLES, []):
         if entry.header or not tables:
             tables.append([])
-        tables[-1].append(TableRow(styled(pack, entry.text, grey), styled(pack, entry.text2, grey), entry.header))
+        tables[-1].append(TableRow(styled(pack, entry.text, grey, chapter=chapter),
+                                   styled(pack, entry.text2, grey, chapter=chapter), entry.header))
     return tables
 
 
@@ -311,18 +352,18 @@ def _story_paragraphs(text: str) -> list[str]:
 # --- Silent letters -------------------------------------------------------------------
 
 def styled(pack: Pack, text: str, grey: bool, linked: tuple[int, ...] = (),
-           syllables_too: bool = False) -> Styled:
-    """``text`` with its silent letters marked, when ``grey`` is set.
+           syllables_too: bool = False, chapter: Chapter | None = None) -> Styled:
+    """``text`` with what its letters are: its silent letters, in ``grey`` too
+    when ``grey`` is set, and, given the ``chapter`` it prints in, its
+    multi-letter graphemes to colour.
 
     Each word is matched as the Prof Tool matches it: to the sentence's own
     words (``linked``, from WordsInSentences) when they follow in order, else to
     ``Words`` by its spelling, case ignored. A word's silent letters are its GPs
-    of type 0; a word that is in no list, or whose GPs do not spell it, is
-    printed without grey.
+    of type 0; a word that is in no list, or whose GPs do not spell it, has none.
     """
-    if not grey:
-        return Styled(text)
     silent: set[int] = set()
+    tints: list[tuple[int, int, str]] = []
     next_linked = 0
     for start, end in word_spans(text, pack.words_by_text):
         word = lower(text[start:end])
@@ -334,14 +375,18 @@ def styled(pack: Pack, text: str, grey: bool, linked: tuple[int, ...] = (),
         else:
             item = _by_spelling(pack, word, syllables_too)
         if item is not None:
-            silent.update(start + offset for offset in _silent_offsets(pack, item, text[start:end]))
-    return Styled(text, frozenset(silent))
+            spans = _gp_spans(pack, item, text[start:end])
+            silent.update(start + offset for offset in _silent_of(pack, spans))
+            if chapter is not None:
+                tints.extend((start + begin, start + end_, kind) for begin, end_, kind in _tints(pack, spans, chapter))
+    return Styled(text, frozenset(silent) if grey else frozenset(), frozenset(silent), tuple(tints))
 
 
-def _styled_item(pack: Pack, item: Item, grey: bool) -> Styled:
-    if not grey:
-        return Styled(item.text)
-    return Styled(item.text, frozenset(_silent_offsets(pack, item, item.text)))
+def _styled_item(pack: Pack, item: Item, grey: bool, chapter: Chapter | None = None) -> Styled:
+    spans = _gp_spans(pack, item, item.text)
+    silent = frozenset(_silent_of(pack, spans))
+    return Styled(item.text, silent if grey else frozenset(), silent,
+                  tuple(_tints(pack, spans, chapter)) if chapter is not None else ())
 
 
 def _by_spelling(pack: Pack, word: str, syllables_too: bool) -> Item | None:
@@ -355,11 +400,11 @@ def _by_spelling(pack: Pack, word: str, syllables_too: bool) -> Item | None:
     return min(candidates, key=lambda item: (item.lesson is None, item.lesson or 0, item.exception, item.id))
 
 
-def _silent_offsets(pack: Pack, item: Item, spelling: str) -> list[int]:
-    """Positions in ``spelling`` of the letters ``item``'s silent GPs spell, or
-    none when its GPs do not spell it exactly. A hyphen between two of them is
-    no GP: "tam-tam" is t-a-m-t-a-m."""
-    offsets: list[int] = []
+def _gp_spans(pack: Pack, item: Item, spelling: str) -> list[tuple[int, int, int]]:
+    """Where in ``spelling`` each of ``item``'s GPs is, as (start, end, GP ID),
+    or nothing when its GPs do not spell it exactly. A hyphen between two of
+    them is no GP: "tam-tam" is t-a-m-t-a-m."""
+    spans: list[tuple[int, int, int]] = []
     position = 0
     for index, gp_id in enumerate(item.gp_ids):
         if index and spelling[position:position + 1] == "-":
@@ -370,7 +415,39 @@ def _silent_offsets(pack: Pack, item: Item, spelling: str) -> list[int]:
         grapheme = lower(gp.grapheme)
         if lower(spelling[position:position + len(grapheme)]) != grapheme:
             return []
-        if gp.silent:
-            offsets.extend(range(position, position + len(grapheme)))
+        spans.append((position, position + len(grapheme), gp_id))
         position += len(grapheme)
-    return offsets if position == len(spelling) else []
+    return spans if position == len(spelling) else []
+
+
+def _silent_offsets(pack: Pack, item: Item, spelling: str) -> list[int]:
+    """Positions in ``spelling`` of the letters ``item``'s silent GPs spell."""
+    return _silent_of(pack, _gp_spans(pack, item, spelling))
+
+
+def _silent_of(pack: Pack, spans: list[tuple[int, int, int]]) -> list[int]:
+    return [offset for start, end, gp_id in spans if pack.gps[gp_id].silent for offset in range(start, end)]
+
+
+def _tints(pack: Pack, spans: list[tuple[int, int, int]], chapter: Chapter) -> list[tuple[int, int, str]]:
+    """The multi-letter graphemes of a word to colour, as the examples colour
+    them (Kalulu-Main's docs/booklet-versions/): the chapter's own, those an
+    earlier lesson taught, and, when two coloured ones touch, the second in the
+    third colour, as "qu" always is. A single letter, a doubled one ("ss") and a
+    silent grapheme (grey instead) are not coloured."""
+    tints: list[tuple[int, int, str]] = []
+    for start, end, gp_id in spans:
+        gp = pack.gps[gp_id]
+        grapheme = lower(gp.grapheme)
+        if gp.silent or len(grapheme) < 2 or len(set(grapheme)) < 2:
+            continue
+        if gp_id in chapter.gp_ids:
+            kind = OWN
+        elif gp.lesson is not None and gp.lesson <= chapter.lesson:
+            kind = EARLIER
+        else:
+            continue
+        if grapheme == "qu" or (tints and tints[-1][1] == start and tints[-1][2] != TOUCHING):
+            kind = TOUCHING
+        tints.append((start, end, kind))
+    return tints

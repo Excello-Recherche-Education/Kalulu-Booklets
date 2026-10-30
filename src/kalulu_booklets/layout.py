@@ -24,7 +24,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen.canvas import Canvas
 
 from kalulu_booklets.content import CURSIVE, Booklet, ChapterContent, Paragraph, Styled, TableRow
-from kalulu_booklets.fonts import Face, Fonts
+from kalulu_booklets.fonts import Face, Fonts, Spacing
 from kalulu_booklets.versions import BASE, Version
 
 PAGE_WIDTH, PAGE_HEIGHT = A5
@@ -127,10 +127,15 @@ class Page:
 class Layout:
     """Decides what goes on each page of one booklet."""
 
-    def __init__(self, booklet: Booklet, fonts: Fonts, version: Version = BASE):
+    def __init__(self, booklet: Booklet, fonts: Fonts, version: Version = BASE,
+                 chosen: dict[int, list[int]] | None = None):
         self.booklet = booklet
         self.fonts = fonts
         self.version = version
+        # Chapter ID -> the sentences chosen for a chapter that picks none, in
+        # the order printed: this layout's own, or, given, another's (an adapted
+        # version prints what the base booklet chose).
+        self.chosen: dict[int, list[int]] = dict(chosen or {})
         self.pages: list[Page] = []
         self.y = TOP
         # Sentences this booklet has printed, so a chosen one is not repeated
@@ -174,7 +179,7 @@ class Layout:
             self.chapter(chapter)
         # Blank pages before the back cover, to fill the last folded sheet. A
         # version not printed as a booklet (the teacher's) is not folded.
-        while self.version.printed and (len(self.pages) + 1) % 4:
+        while self.version.folded and (len(self.pages) + 1) % 4:
             self.new_page(numbered=False)
         self.back_cover()
         return self.pages
@@ -196,6 +201,9 @@ class Layout:
                 _centered(canvas, script, label, COVER_LABEL_Y, COVER_LABEL_SIZE, self.version.label_color or INK)
 
         self.add(draw)
+
+    def draw_folio(self, canvas: Canvas, number: int) -> None:
+        _centered(canvas, self.fonts.script, str(number), FOLIO_Y, FOLIO_SIZE, FOLIO)
 
     def back_cover(self) -> None:
         self.new_page(numbered=False)
@@ -243,12 +251,15 @@ class Layout:
         self.add(lambda canvas: canvas.drawImage(picture, left, bottom, shown_width, shown_height, mask="auto"))
         self.y = BOTTOM
 
-    def title(self, lines: list[str]) -> None:
-        """Script on the left; cursive, when the language has it, on the right."""
+    def title(self, lines: list[str], sizes: dict[int, float] = TITLE_SIZES,
+              cursive_too: bool = True) -> float | None:
+        """Script on the left; cursive, when the language has it, on the right.
+        ``sizes`` by the number of lines; ``cursive_too`` False prints the
+        script alone, centred. Returns the last line's baseline."""
         script, cursive = self.fonts.script, self.fonts.cursive
-        with_cursive = self.booklet.cursive
+        with_cursive = self.booklet.cursive and cursive_too
         half = WIDTH / 2 - 3 * mm if with_cursive else WIDTH
-        size = TITLE_SIZES.get(len(lines), 22)
+        size = sizes.get(len(lines), 22)
         for line in lines:
             size = min(size, _fit(script, line, half),
                        _fit(cursive, line, half) / CURSIVE_TITLE_SCALE if with_cursive else size)
@@ -279,8 +290,9 @@ class Layout:
         self.add(draw)
         if lines:
             self.y = baselines[-1] + bottoms[-1] - GAP
-        else:
-            self.y -= GAP
+            return baselines[-1]
+        self.y -= GAP
+        return None
 
     def grid(self, content: ChapterContent, items: list[Styled], columns: int, size: float, row: float) -> None:
         columns = max(1, min(columns, len(items)))
@@ -379,6 +391,7 @@ class Layout:
             pool.pop(index)
             placed += 1
             top_of_page = False
+        self.chosen[content.chapter.id] = printed
         earlier = [sentence_id for sentence_id in printed if sentence_id not in content.sentences_teaching]
         if earlier:
             own = len(content.sentences_teaching)
@@ -532,19 +545,30 @@ class Layout:
 
 # --- Writing the PDF ---------------------------------------------------------------
 
+def layout_for(booklet: Booklet, fonts: Fonts, version: Version = BASE,
+               chosen: dict[int, list[int]] | None = None) -> Layout:
+    """The layout a version is made with: an adapted version's own
+    (adapted.py), or this module's."""
+    if version.adapted:
+        from kalulu_booklets.adapted import AdaptedLayout  # it builds on this module
+        return AdaptedLayout(booklet, fonts, version, chosen)
+    return Layout(booklet, fonts, version, chosen)
+
+
 def write(booklet: Booklet, fonts: Fonts, path: Path, version: Version = BASE,
-          imposed_path: Path | None = None) -> int:
+          imposed_path: Path | None = None, chosen: dict[int, list[int]] | None = None) -> int:
     """Lays out and writes one booklet in one version; returns its number of
     pages. With ``imposed_path``, also writes it for printing: A4 landscape,
     two pages a sheet, in saddle-stitch order (the last and the first, then
     the second and the second-to-last...), so that the printed sheets, folded
     and stapled, read in order."""
-    pages = Layout(booklet, fonts, version).run()
+    laid_out = layout_for(booklet, fonts, version, chosen)
+    pages = laid_out.run()
     folios = _folios(pages)
     path.parent.mkdir(parents=True, exist_ok=True)
     canvas = _canvas(path, booklet, version, A5)
     for page, folio in zip(pages, folios):
-        _draw_page(canvas, page, folio, fonts)
+        _draw_page(canvas, page, folio, laid_out)
         canvas.showPage()
     canvas.save()
     if imposed_path is not None:
@@ -553,7 +577,7 @@ def write(booklet: Booklet, fonts: Fonts, path: Path, version: Version = BASE,
             for index, shift in ((left, 0), (right, PAGE_WIDTH)):
                 canvas.saveState()
                 canvas.translate(shift, 0)
-                _draw_page(canvas, pages[index], folios[index], fonts)
+                _draw_page(canvas, pages[index], folios[index], laid_out)
                 canvas.restoreState()
             canvas.showPage()
         canvas.save()
@@ -591,13 +615,13 @@ def _canvas(path: Path, booklet: Booklet, version: Version, size: tuple[float, f
     return canvas
 
 
-def _draw_page(canvas: Canvas, page: Page, folio: int, fonts: Fonts) -> None:
+def _draw_page(canvas: Canvas, page: Page, folio: int, laid_out: Layout) -> None:
     for step in page.steps:
         canvas.saveState()
         step(canvas)
         canvas.restoreState()
     if page.numbered:
-        _centered(canvas, fonts.script, str(folio), FOLIO_Y, FOLIO_SIZE, FOLIO)
+        laid_out.draw_folio(canvas, folio)
 
 
 # --- Drawing helpers ---------------------------------------------------------------
@@ -686,29 +710,14 @@ def _star(canvas: Canvas, x: float, y: float, outer: float, inner: float, color:
     canvas.drawPath(path, stroke=0, fill=1)
 
 
-def _slice(text: Styled, start: int, end: int) -> Styled:
-    return Styled(text.text[start:end], frozenset(index - start for index in text.grey if start <= index < end))
-
-
-def _joined(pieces: list[Styled]) -> Styled:
-    """Sentences sharing a line, one space apart."""
-    text, grey, offset = [], set(), 0
-    for piece in pieces:
-        if text:
-            text.append(" ")
-            offset += 1
-        text.append(piece.text)
-        grey.update(offset + index for index in piece.grey)
-        offset += len(piece.text)
-    return Styled("".join(text), frozenset(grey))
-
-
-def _wrap(face: Face, paragraph: Paragraph, size: float, width: float) -> list[list[Styled]]:
-    """A paragraph's printed lines, cut between words, as lists of words."""
-    space = face.width(" ", size)
+def _wrap(face: Face, paragraph: Paragraph, size: float, width: float,
+          spacing: Spacing | None = None) -> list[list[Styled]]:
+    """A paragraph's printed lines, cut between words, as lists of words, with
+    the letter and word ``spacing`` they are drawn with."""
+    space = face.width(" ", size, spacing)
     printed: list[list[Styled]] = []
     for pieces in paragraph.lines:
-        line = _joined(pieces)
+        line = Styled.joined(pieces)
         current: list[Styled] = []
         used = 0.0
         start = None
@@ -721,8 +730,8 @@ def _wrap(face: Face, paragraph: Paragraph, size: float, width: float) -> list[l
             elif start is None:
                 start = index
         for start, end in bounds:
-            word = _slice(line, start, end)
-            word_width = face.width(word.text, size)
+            word = line.slice(start, end)
+            word_width = face.width(word.text, size, spacing)
             if current and used + space + word_width > width:
                 printed.append(current)
                 current, used = [], 0.0

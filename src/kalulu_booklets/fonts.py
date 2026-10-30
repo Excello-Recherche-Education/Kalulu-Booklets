@@ -77,6 +77,14 @@ def find(pack_file: Path, replaced: dict[str, str] | None = None) -> Path:
 
 
 @dataclass(frozen=True)
+class Spacing:
+    """Letter and word spacing, in em: ``tracking`` added after every glyph,
+    ``space`` the whole advance of a space (None keeps the font's)."""
+    tracking: float = 0.0
+    space: float | None = None
+
+
+@dataclass(frozen=True)
 class Glyph:
     char: str  # the character ReportLab draws this glyph with
     cluster: int  # index in the shaped text of the letter it comes from
@@ -150,26 +158,54 @@ class Face:
                 bottom = min(bottom, (pen.bounds[1] + position.y_offset) / self.units)
         return top, bottom
 
-    def width(self, text: str, size: float) -> float:
-        return sum(glyph.advance for glyph in self.shape(text)) * size
+    def width(self, text: str, size: float, spacing: Spacing | None = None) -> float:
+        glyphs = self.shape(text)
+        if spacing is None:
+            return sum(glyph.advance for glyph in glyphs) * size
+        return sum(self._advance(text, glyph, size, spacing) for glyph in glyphs)
+
+    @staticmethod
+    def _advance(text: str, glyph: Glyph, size: float, spacing: Spacing) -> float:
+        """A glyph's advance with ``spacing``: a space as wide as asked, any
+        other glyph followed by the extra letter spacing."""
+        if text[glyph.cluster] == " " and spacing.space is not None:
+            return spacing.space * size
+        return (glyph.advance + spacing.tracking) * size
 
     def draw(self, canvas: Canvas, x: float, y: float, text: str, size: float,
-             color: object, grey: frozenset[int] = frozenset(), grey_color: object = None) -> float:
+             color: object, grey: frozenset[int] = frozenset(), grey_color: object = None,
+             colors: dict[int, object] | None = None, spacing: Spacing | None = None,
+             outline: tuple[object, float] | None = None) -> float:
         """Draws ``text`` with its baseline at ``y``; returns its width. The
-        glyphs of the letters in ``grey`` are drawn in ``grey_color``."""
+        glyphs of the letters in ``grey`` are drawn in ``grey_color``, those in
+        ``colors`` (text position -> colour) in theirs, grey first. ``spacing``
+        sets the letter and word spacing; ``outline`` (colour, width) strokes
+        each glyph around its fill, as a letter to trace over."""
         glyphs = self.shape(text)
         drawn = canvas.beginText()
         drawn.setFont(self.name, size)
+        if outline is not None:
+            drawn.setTextRenderMode(2)
+            drawn.setStrokeColor(outline[0])
+            canvas.setLineWidth(outline[1])
         current = None
+        extra = 0.0  # what the spacing has added so far
         for glyph in glyphs:
-            wanted = grey_color if glyph.cluster in grey and grey_color is not None else color
+            if glyph.cluster in grey and grey_color is not None:
+                wanted = grey_color
+            elif colors and glyph.cluster in colors:
+                wanted = colors[glyph.cluster]
+            else:
+                wanted = color
             if wanted is not current:
                 drawn.setFillColor(wanted)
                 current = wanted
-            drawn.setTextOrigin(x + glyph.x * size, y + glyph.y * size)
+            drawn.setTextOrigin(x + glyph.x * size + extra, y + glyph.y * size)
             drawn.textOut(glyph.char)
+            if spacing is not None:
+                extra += self._advance(text, glyph, size, spacing) - glyph.advance * size
         canvas.drawText(drawn)
-        return sum(glyph.advance for glyph in glyphs) * size
+        return sum(glyph.advance for glyph in glyphs) * size + extra
 
     def _char_for(self, gid: int, advance: int) -> str:
         face = self._ttf.face
