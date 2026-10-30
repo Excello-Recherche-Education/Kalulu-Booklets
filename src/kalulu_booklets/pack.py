@@ -10,6 +10,7 @@ The pack is opened read-only; nothing here ever writes to it.
 from __future__ import annotations
 
 import sqlite3
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -35,6 +36,27 @@ SETTINGS = (
     "UppercaseProportion", "SentenceFont", "SentenceFirstFont", "SentencePages",
     "WritingModels", "WritingTracings",
 )
+
+
+# How a GP's grapheme or phoneme is spelled in its asset file names, as the game
+# spells them (Kalulu-Frontend Database._text_to_file_name()): a symbol as a
+# word, a text with a capital as "cap." and its lowercase, so that "e-E" and
+# "e-e" stay two files on a filesystem that folds case.
+_SYMBOL_NAMES = {"#": "sharp", "@": "at", "*": "star", "$": "usd", "%": "pcent", "§": "para"}
+LOOK_AND_LEARN_IMAGES = Path("look_and_learn") / "images"
+
+
+def _is_png(path: Path) -> bool:
+    """Not a Git LFS pointer left in its place: a checkout without the media has
+    small text files under the images' names."""
+    with path.open("rb") as file:
+        return file.read(8) == b"\x89PNG\r\n\x1a\n"
+
+
+def _file_name(text: str) -> str:
+    if text in _SYMBOL_NAMES:
+        return _SYMBOL_NAMES[text]
+    return text if text == text.lower() else "cap." + text.lower()
 
 
 # The fonts a language can replace (fonts.py's roles) -> the BookletSettings
@@ -169,6 +191,22 @@ class Pack:
         """The value a chapter prints with: its own, or the language's."""
         return chapter.overrides.get(column, self.settings[column])
 
+    def picture(self, gp_id: int | None) -> Path | None:
+        """A GP's Look & Learn image, as the game finds it: by its encoded name,
+        else by its raw one, composed or decomposed (packs store "ç" either way).
+        None when the GP or its image is missing, or the image is a Git LFS
+        pointer."""
+        gp = self.gps.get(gp_id) if gp_id is not None else None
+        if gp is None:
+            return None
+        folder = self.path.parent / LOOK_AND_LEARN_IMAGES
+        for name in (f"{_file_name(gp.grapheme)}-{_file_name(gp.phoneme)}", f"{gp.grapheme}-{gp.phoneme}"):
+            for form in ("NFC", "NFD"):
+                path = folder / f"{unicodedata.normalize(form, name)}.png"
+                if path.is_file() and _is_png(path):
+                    return path
+        return None
+
     def booklets(self) -> list[int]:
         return sorted({chapter.booklet for chapter in self.chapters})
 
@@ -258,12 +296,17 @@ def _load(db: sqlite3.Connection, path: Path) -> Pack:
     made = default_chapters(lesson_numbers, lesson_gps, gps, list(chapters.values()))
     chapters.update({chapter.id: chapter for chapter in made})
 
-    return Pack(
+    pack = Pack(
         locale=path.parent.name, path=path, gps=gps, words=words, syllables=syllables,
         sentences=sentences, settings=settings,
         chapters=sorted(chapters.values(), key=lambda chapter: (chapter.lesson, chapter.position, chapter.id)),
         words_by_text=_by_text(words), syllables_by_text=_by_text(syllables), fonts=fonts,
         made_chapters_for=[chapter.lesson for chapter in made])
+    # A made chapter's teacher picture: the first of its GPs with a Look & Learn
+    # image, as the Prof Tool's BookletData.first_gp_with_image() chooses it.
+    for chapter in made:
+        chapter.image_gp_id = next((gp_id for gp_id in chapter.gp_ids if pack.picture(gp_id)), None)
+    return pack
 
 
 def default_chapters(lesson_numbers: dict[int, int], lesson_gps: dict[int, list[int]],
@@ -273,8 +316,8 @@ def default_chapters(lesson_numbers: dict[int, int], lesson_gps: dict[int, list[
     (BookletData.add_missing_chapters()), in the lessons' order: the lesson's GPs,
     a title made of them, the language's settings, and the booklet of the last
     chapter at or before that lesson (1 when there is none). Their IDs are
-    negative, which no row has. The teacher's picture is left out: the teacher's
-    booklet is not printed yet."""
+    negative, which no row has. The teacher's picture is chosen once the pack is
+    loaded (``_load()``), since it depends on the images on disk."""
     have = {chapter.lesson for chapter in existing}
     chapters: list[Chapter] = []
     for lesson_id, number in sorted(lesson_numbers.items(), key=lambda pair: pair[1]):

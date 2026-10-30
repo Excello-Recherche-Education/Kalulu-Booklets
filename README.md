@@ -114,6 +114,7 @@ engine applies.
 .venv/bin/kalulu-booklets build fr_FR                         # the pack pinned in kalulu-languages/
 .venv/bin/kalulu-booklets build ../Kalulu-Languages/fr_FR     # any pack folder, saved or not
 .venv/bin/kalulu-booklets build fr_FR --booklet 1 --out /tmp/booklets
+.venv/bin/kalulu-booklets build fr_FR --version teacher       # one version only
 ```
 
 A bare locale reads the pack pinned in `kalulu-languages/`; a path reads any pack
@@ -121,8 +122,24 @@ folder (or its `language.db`), such as a Kalulu-Languages checkout the Prof Tool
 has just saved to, so a change can be seen before it is committed. The pack is
 only ever read.
 
-One PDF is written per booklet, `build/<locale>/<locale>-booklet-<n>.pdf` by
-default. Then comes a list of what to look at: what the pack asks for and the
+Every booklet is written in each of its **versions**, one folder per version under
+`build/<locale>/`. Every version has the same content; only the pages differ:
+
+| Version | Folder, file | What changes |
+|---|---|---|
+| base | `base/<locale>-booklet-<n>.pdf` | the booklet itself |
+| teacher | `teacher/<locale>-booklet-<n>-teacher.pdf` | before each chapter, a page with its title and its picture (the Look & Learn image the chapter names), under the same page number as the chapter page, so that a teacher's copy and the pupils' agree. "Version enseignant" on the cover |
+| no writing pages | `no-writing/<locale>-booklet-<n>-no-writing.pdf` | without its writing pages |
+
+The base and no-writing versions are also written **for printing**, as
+`…-print.pdf`: A4 landscape, two A5 pages a side, in saddle-stitch order (the last
+and the first, then the second and the second-to-last…), so that the sheets,
+printed on both sides, folded and stapled, read in order. A booklet printed that
+way has a multiple of four pages, which blank pages before the back cover make up.
+The teacher's pictures need the pack's `look_and_learn/images/`, which are in Git
+LFS: without them, the teacher version has no teacher pages, and the build says so.
+
+Then comes a list of what to look at: what the pack asks for and the
 booklet cannot print, such as a chapter with nothing in it, sentences that do not
 fit the pages allowed, or a sentence its lesson cannot read yet. It also lists a
 chapter that picks no sentence and has too few of its own to fill its pages: the

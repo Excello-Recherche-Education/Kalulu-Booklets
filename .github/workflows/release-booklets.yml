@@ -2,8 +2,8 @@ name: Release Booklets
 
 # Builds the booklets of every language pack and publishes them, all in one
 # GitHub release, as one zip per language: Kalulu-Booklets-<locale>.zip holds a
-# folder of that language's PDFs (and, once there are booklet options, a
-# subfolder per option, as the generator writes them) and its build notes.
+# folder of that language's PDFs, a subfolder per version (base, teacher,
+# no-writing...: versions.py), as the generator writes them, and its build notes.
 # Run by hand: Actions -> Release Booklets -> Run workflow.
 #
 # The booklets are never committed (build/ is ignored): this release is where
@@ -31,8 +31,9 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      # The packs' media (~1.3 GB) are in Git LFS, and the booklets need none
-      # of them: language.db and fonts/ are plain files.
+      # The packs' media (~1.3 GB) are in Git LFS, and the booklets need only
+      # the Look & Learn images (the teacher's pages), fetched below:
+      # language.db and fonts/ are plain files.
       GIT_LFS_SKIP_SMUDGE: "1"
 
     steps:
@@ -49,6 +50,9 @@ jobs:
         run: |
           git -C kalulu-languages fetch --quiet origin "$REF"
           git -C kalulu-languages checkout --quiet --detach FETCH_HEAD
+
+      - name: Fetch the Look & Learn images
+        run: git -C kalulu-languages lfs pull --include "*/look_and_learn/images/*"
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -115,11 +119,13 @@ jobs:
           {
             echo "The Kalulu reading booklets of every language pack, as PDF, A5 (148 × 210 mm): one zip per language."
             echo
+            echo "Each zip holds a folder per version: \`base\`, \`teacher\` (a page with the chapter's picture before each chapter, under the same page number) and \`no-writing\` (without the writing pages). The \`-print\` files are the same booklets on A4 sheets, two pages a side, in the order a folded and stapled booklet reads them."
+            echo
             echo "| Language | Download | Booklets | Pages |"
             echo "|---|---|---|---|"
             for locale in $LOCALES; do
-              count="$(find "stage/Kalulu-Booklets-$locale" -name '*.pdf' | wc -l | tr -d ' ')"
-              pages="$(grep -oE '\(([0-9]+) pages' "build/$locale.log" | grep -oE '[0-9]+' | paste -sd ' ' -)"
+              count="$(find "stage/Kalulu-Booklets-$locale/base" -name '*.pdf' ! -name '*-print.pdf' | wc -l | tr -d ' ')"
+              pages="$(grep '/base/' "build/$locale.log" | grep -oE '\(([0-9]+) pages' | grep -oE '[0-9]+' | paste -sd ' ' -)"
               echo "| \`$locale\` | \`Kalulu-Booklets-$locale.zip\` | $count | $pages |"
             done
             echo

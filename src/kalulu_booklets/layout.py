@@ -18,13 +18,14 @@ from pathlib import Path
 from typing import Callable
 
 from reportlab.lib.colors import HexColor, black, white
-from reportlab.lib.pagesizes import A5
+from reportlab.lib.pagesizes import A4, A5, landscape
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen.canvas import Canvas
 
 from kalulu_booklets.content import CURSIVE, Booklet, ChapterContent, Paragraph, Styled, TableRow
 from kalulu_booklets.fonts import Face, Fonts
+from kalulu_booklets.versions import BASE, Version
 
 PAGE_WIDTH, PAGE_HEIGHT = A5
 MARGIN_SIDE = 14 * mm
@@ -107,6 +108,11 @@ CATERPILLAR_HEIGHT = 9 * mm
 BUBBLE_TAIL = 8 * mm  # how far the fluency bubble's tail reaches down
 STOPWATCH = 5 * mm
 
+# The cover's version line (versions.py), measured on the printed teacher and
+# adapted booklets: Mulish Light 20.7 pt, its baseline 178 mm from the top.
+COVER_LABEL_SIZE = 20.7
+COVER_LABEL_Y = PAGE_HEIGHT - 178 * mm
+
 Draw = Callable[[Canvas], None]
 
 
@@ -114,14 +120,17 @@ Draw = Callable[[Canvas], None]
 class Page:
     steps: list[Draw] = field(default_factory=list)
     numbered: bool = True
+    # A teacher's page carries the number of the chapter page after it.
+    shares_next_number: bool = False
 
 
 class Layout:
     """Decides what goes on each page of one booklet."""
 
-    def __init__(self, booklet: Booklet, fonts: Fonts):
+    def __init__(self, booklet: Booklet, fonts: Fonts, version: Version = BASE):
         self.booklet = booklet
         self.fonts = fonts
+        self.version = version
         self.pages: list[Page] = []
         self.y = TOP
         # Sentences this booklet has printed, so a chosen one is not repeated
@@ -130,8 +139,8 @@ class Layout:
 
     # --- Pages ---------------------------------------------------------------------
 
-    def new_page(self, numbered: bool = True) -> Page:
-        self.pages.append(Page(numbered=numbered))
+    def new_page(self, numbered: bool = True, shares_next_number: bool = False) -> Page:
+        self.pages.append(Page(numbered=numbered, shares_next_number=shares_next_number))
         self.y = TOP
         return self.pages[-1]
 
@@ -163,8 +172,9 @@ class Layout:
         self.cover()
         for chapter in self.booklet.chapters:
             self.chapter(chapter)
-        # Blank pages before the back cover, to fill the last folded sheet.
-        while (len(self.pages) + 1) % 4:
+        # Blank pages before the back cover, to fill the last folded sheet. A
+        # version not printed as a booklet (the teacher's) is not folded.
+        while self.version.printed and (len(self.pages) + 1) % 4:
             self.new_page(numbered=False)
         self.back_cover()
         return self.pages
@@ -173,6 +183,8 @@ class Layout:
         self.new_page(numbered=False)
         number = str(self.booklet.number)
         black_face = self.fonts.script_black
+        label = self.version.label(self.booklet.locale)
+        script = self.fonts.script
 
         def draw(canvas: Canvas) -> None:
             _centered(canvas, black_face, "Kalulu", PAGE_HEIGHT * 0.72, 54, INK)
@@ -180,6 +192,8 @@ class Layout:
             size = 64
             _centered(canvas, black_face, number,
                       PAGE_HEIGHT * 0.42 - black_face.cap_height * size / 2, size, INK)
+            if label:
+                _centered(canvas, script, label, COVER_LABEL_Y, COVER_LABEL_SIZE, self.version.label_color or INK)
 
         self.add(draw)
 
@@ -191,6 +205,8 @@ class Layout:
     # --- A chapter -----------------------------------------------------------------
 
     def chapter(self, content: ChapterContent) -> None:
+        if self.version.teacher and content.picture is not None:
+            self.teacher_page(content)
         self.new_page()
         if content.title:
             self.title(content.title)
@@ -206,10 +222,26 @@ class Layout:
             self.table(content, table, with_penguin=index == 0)
         for title, paragraphs in content.stories:
             self.story(content, title, paragraphs)
-        if content.writing and content.writing_models + content.writing_tracings > 0:
+        if self.version.writing and content.writing and content.writing_models + content.writing_tracings > 0:
             self.writing(content)
         if content.fluency:
             self.fluency(content, content.fluency)
+
+    def teacher_page(self, content: ChapterContent) -> None:
+        """The chapter's title and its picture, as large as the page allows,
+        before the chapter page and under its number: the teacher shows it to
+        the class while the pupils read the page after it."""
+        self.new_page(shares_next_number=True)
+        if content.title:
+            self.title(content.title)
+        picture = ImageReader(str(content.picture))
+        width, height = picture.getSize()
+        scale = min(WIDTH / width, (self.y - BOTTOM) / height)
+        shown_width, shown_height = width * scale, height * scale
+        left = (PAGE_WIDTH - shown_width) / 2
+        bottom = BOTTOM + (self.y - BOTTOM - shown_height) / 2
+        self.add(lambda canvas: canvas.drawImage(picture, left, bottom, shown_width, shown_height, mask="auto"))
+        self.y = BOTTOM
 
     def title(self, lines: list[str]) -> None:
         """Script on the left; cursive, when the language has it, on the right."""
@@ -500,25 +532,72 @@ class Layout:
 
 # --- Writing the PDF ---------------------------------------------------------------
 
-def write(booklet: Booklet, fonts: Fonts, path: Path) -> int:
-    """Lays out and writes one booklet; returns its number of pages."""
-    pages = Layout(booklet, fonts).run()
+def write(booklet: Booklet, fonts: Fonts, path: Path, version: Version = BASE,
+          imposed_path: Path | None = None) -> int:
+    """Lays out and writes one booklet in one version; returns its number of
+    pages. With ``imposed_path``, also writes it for printing: A4 landscape,
+    two pages a sheet, in saddle-stitch order (the last and the first, then
+    the second and the second-to-last...), so that the printed sheets, folded
+    and stapled, read in order."""
+    pages = Layout(booklet, fonts, version).run()
+    folios = _folios(pages)
     path.parent.mkdir(parents=True, exist_ok=True)
-    canvas = Canvas(str(path), pagesize=A5)
-    canvas.setTitle(f"Kalulu - {booklet.locale} - {booklet.number}")
-    canvas.setAuthor("Excello Recherche & Education")
-    canvas.setSubject("Kalulu reading booklet")
-    script = fonts.script
-    for number, page in enumerate(pages, start=1):
-        for step in page.steps:
-            canvas.saveState()
-            step(canvas)
-            canvas.restoreState()
-        if page.numbered:
-            _centered(canvas, script, str(number), FOLIO_Y, FOLIO_SIZE, FOLIO)
+    canvas = _canvas(path, booklet, version, A5)
+    for page, folio in zip(pages, folios):
+        _draw_page(canvas, page, folio, fonts)
         canvas.showPage()
     canvas.save()
+    if imposed_path is not None:
+        canvas = _canvas(imposed_path, booklet, version, landscape(A4))
+        for left, right in imposition(len(pages)):
+            for index, shift in ((left, 0), (right, PAGE_WIDTH)):
+                canvas.saveState()
+                canvas.translate(shift, 0)
+                _draw_page(canvas, pages[index], folios[index], fonts)
+                canvas.restoreState()
+            canvas.showPage()
+        canvas.save()
     return len(pages)
+
+
+def imposition(count: int) -> list[tuple[int, int]]:
+    """The pages (0-based) on each side of each A4 sheet, left then right, for
+    a booklet of ``count`` pages, a multiple of four."""
+    return [(count - 1 - side, side) if side % 2 == 0 else (side, count - 1 - side) for side in range(count // 2)]
+
+
+def _folios(pages: list[Page]) -> list[int]:
+    """Each page's number, counting the cover as 1. A teacher's page takes the
+    number of the page after it and is not counted."""
+    folios = [0] * len(pages)
+    number = 0
+    for index, page in enumerate(pages):
+        if not page.shares_next_number:
+            number += 1
+            folios[index] = number
+    for index in range(len(pages) - 1, -1, -1):
+        if pages[index].shares_next_number:
+            folios[index] = folios[index + 1] if index + 1 < len(pages) else number + 1
+    return folios
+
+
+def _canvas(path: Path, booklet: Booklet, version: Version, size: tuple[float, float]) -> Canvas:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    canvas = Canvas(str(path), pagesize=size)
+    suffix = "" if version.name == "base" else f" - {version.name}"
+    canvas.setTitle(f"Kalulu - {booklet.locale} - {booklet.number}{suffix}")
+    canvas.setAuthor("Excello Recherche & Education")
+    canvas.setSubject("Kalulu reading booklet")
+    return canvas
+
+
+def _draw_page(canvas: Canvas, page: Page, folio: int, fonts: Fonts) -> None:
+    for step in page.steps:
+        canvas.saveState()
+        step(canvas)
+        canvas.restoreState()
+    if page.numbered:
+        _centered(canvas, fonts.script, str(folio), FOLIO_Y, FOLIO_SIZE, FOLIO)
 
 
 # --- Drawing helpers ---------------------------------------------------------------
