@@ -81,6 +81,9 @@ class ChapterContent:
     writing_tracings: int
     fluency: list[Styled]
     stories: list[tuple[str, list[Styled]]]
+    # The pool's sentences that hold one of the chapter's GPs: the others are
+    # earlier lessons' content, taken only to fill the pages.
+    sentences_teaching: frozenset[int] = frozenset()
 
     def is_empty(self) -> bool:
         return not (self.title or self.syllables or self.words or self.paragraphs or self.sentence_pool
@@ -123,7 +126,7 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
     sentence_pages = int(setting("SentencePages"))
     if sentence_pages < 0 and chapter.sentences:
         notes.append(f"SentencePages is -1, so its {len(chapter.sentences)} sentence(s) are not printed")
-    pool = _sentence_pool(pack, chapter, grey) if sentence_pages >= 0 and not chapter.sentences else []
+    pool, teaching = _sentence_pool(pack, chapter, grey) if sentence_pages >= 0 and not chapter.sentences else ([], set())
     if sentence_pages >= 0 and not chapter.sentences and not pool:
         notes.append("no sentence is readable at this lesson")
 
@@ -147,6 +150,7 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
         fluency=[styled(pack, entry.text, grey) for entry in chapter.entries.get(packs.FLUENCY, [])],
         stories=[(story.title.strip(), [styled(pack, paragraph, grey) for paragraph in _story_paragraphs(story.text)])
                  for story in chapter.stories],
+        sentences_teaching=frozenset(teaching),
     )
 
 
@@ -239,12 +243,13 @@ def _paragraphs(pack: Pack, chapter: Chapter, grey: bool, uppercase: float,
     return paragraphs
 
 
-def _sentence_pool(pack: Pack, chapter: Chapter, grey: bool) -> list[tuple[int, Styled]]:
+def _sentence_pool(pack: Pack, chapter: Chapter, grey: bool) -> tuple[list[tuple[int, Styled]], set[int]]:
     """What a chapter that picks no sentence chooses from: the sentences readable
     at its lesson, exceptions left out. Those with a word holding one of its GPs
     come first, then the others, since the point is to fill the pages; within
     each, booklet-only ones first, then in the pack's order. The layout takes as
-    many as fit, whole."""
+    many as fit, whole. Also the IDs of those holding one of its GPs: the layout
+    says when it had to print others."""
     taught = set(chapter.gp_ids)
     ranked = []
     for sentence in pack.sentences.values():
@@ -254,7 +259,8 @@ def _sentence_pool(pack: Pack, chapter: Chapter, grey: bool) -> list[tuple[int, 
         teaches = any(taught.intersection(pack.words[word_id].gp_ids) for word_id in sentence.word_ids)
         ranked.append(((not teaches, not sentence.booklet_only, sentence.id), sentence))
     ranked.sort(key=lambda pair: pair[0])
-    return [(sentence.id, styled(pack, sentence.text, grey, linked=sentence.word_ids)) for _, sentence in ranked]
+    teaching = {sentence.id for key, sentence in ranked if not key[0]}
+    return [(sentence.id, styled(pack, sentence.text, grey, linked=sentence.word_ids)) for _, sentence in ranked], teaching
 
 
 def _paragraph_font(pack: Pack, chapter: Chapter, index: int) -> str:

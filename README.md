@@ -124,8 +124,10 @@ only ever read.
 One PDF is written per booklet, `build/<locale>/<locale>-booklet-<n>.pdf` by
 default. Then comes a list of what to look at: what the pack asks for and the
 booklet cannot print, such as a chapter with nothing in it, sentences that do not
-fit the pages allowed, or a sentence its lesson cannot read yet. None of it stops
-the build.
+fit the pages allowed, or a sentence its lesson cannot read yet. It also lists a
+chapter that picks no sentence and has too few of its own to fill its pages: the
+generator then prints sentences that hold none of the chapter's GPs, earlier
+lessons' content, and says how many. None of it stops the build.
 
 **The booklets are never committed**: `build/` is ignored. They are published as
 a release instead, by the **Release Booklets** workflow (Actions → Release

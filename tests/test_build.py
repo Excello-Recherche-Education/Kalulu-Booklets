@@ -78,3 +78,26 @@ def test_chosen_sentences_are_whole_and_one_that_overflows_is_passed_over(pack_f
     pages.chosen_sentences(chapter)
     assert pages.printed_sentences == {1, 2}  # the long one does not fit, the two short ones do
     assert len(pages.pages) == 1
+
+
+def _built_notes(pack_folder):
+    booklet = content.booklet(load(pack_folder), 1)
+    pages = layout.Layout(booklet, fonts.load(fonts.PINNED))
+    pages.run()
+    return booklet.notes
+
+
+def test_sentences_from_earlier_lessons_filling_a_chapter_are_said(pack_folder):
+    # "La la." holds no "u": it is lesson 2's, printed only to fill the page.
+    execute(pack_folder, "INSERT INTO Sentences (ID, Sentence) VALUES (3, 'La la.')")
+    for position in range(2):
+        execute(pack_folder, "INSERT INTO WordsInSentences (SentenceID, WordID, Position) VALUES (3, 1, ?)", position)
+    add_chapter(pack_folder, 3, [3], SyllableCount=0, WordCount=0, SentencePages=0)
+    notes = [note for note in _built_notes(pack_folder) if note.startswith("Lesson 3")]
+    assert "Lesson 3, chapter 1: not enough content of its own: 1 of its 3 sentences holds none of its GPs, " \
+           "taken from earlier lessons to fill its pages (only 2 readable sentences hold one)" in notes
+
+
+def test_a_chapter_filled_with_its_own_sentences_says_nothing(pack_folder):
+    add_chapter(pack_folder, 3, [3], SyllableCount=0, WordCount=0, SentencePages=0)
+    assert not [note for note in _built_notes(pack_folder) if "not enough content" in note]
