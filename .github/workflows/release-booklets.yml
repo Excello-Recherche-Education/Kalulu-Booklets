@@ -3,7 +3,7 @@ name: Release Booklets
 # Builds the booklets of every language pack and publishes them, all in one
 # GitHub release, as one zip per language: Kalulu-Booklets-<locale>.zip holds a
 # folder of that language's PDFs, a subfolder per version (base, teacher,
-# no-writing...: versions.py), as the generator writes them, and its build notes.
+# no-writing, dyslexia, dyspraxia, adhd: versions.py), as the generator writes them, and its build notes.
 # Run by hand: Actions -> Release Booklets -> Run workflow.
 #
 # The booklets are never committed (build/ is ignored): this release is where
@@ -119,7 +119,7 @@ jobs:
           {
             echo "The Kalulu reading booklets of every language pack, as PDF, A5 (148 × 210 mm): one zip per language."
             echo
-            echo "Each zip holds a folder per version: \`base\`, \`teacher\` (a page with the chapter's picture before each chapter, under the same page number) and \`no-writing\` (without the writing pages). The \`-print\` files are the same booklets on A4 sheets, two pages a side, in the order a folded and stapled booklet reads them."
+            echo "Each zip holds a folder per version: \`base\`, \`teacher\` (a page with the chapter's picture before each chapter, under the same page number) \`no-writing\` (without the writing pages), and the three adapted ones, \`dyslexia\`, \`dyspraxia\` and \`adhd\` (bigger and airier text, a chapter over several pages; dyspraxia and adhd colour the multi-letter graphemes). The \`-print\` files are the same booklets on A4 sheets, two pages a side, in the order a folded and stapled booklet reads them."
             echo
             echo "| Language | Download | Booklets | Pages |"
             echo "|---|---|---|---|"
