@@ -1,0 +1,147 @@
+name: Release Booklets
+
+# Builds the booklets of every language pack and publishes them, all in one
+# GitHub release, as one zip per language: Kalulu-Booklets-<locale>.zip holds a
+# folder of that language's PDFs (and, once there are booklet options, a
+# subfolder per option, as the generator writes them) and its build notes.
+# Run by hand: Actions -> Release Booklets -> Run workflow.
+#
+# The booklets are never committed (build/ is ignored): this release is where
+# they are downloaded from. Nothing is published unless every pack builds, so a
+# release always holds every language.
+
+on:
+  workflow_dispatch:
+    inputs:
+      languages_ref:
+        description: >-
+          Kalulu-Languages branch, tag or commit to build from. Empty: the
+          commit kalulu-languages/ is pinned to in this repository.
+        required: false
+        default: ""
+      prerelease:
+        description: "Mark the release as a pre-release instead of Latest"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      # The packs' media (~1.3 GB) are in Git LFS, and the booklets need none
+      # of them: language.db and fonts/ are plain files.
+      GIT_LFS_SKIP_SMUDGE: "1"
+
+    steps:
+      - name: Check out the generator and the pinned language packs
+        uses: actions/checkout@v5
+        with:
+          submodules: true
+          lfs: false
+
+      - name: Move the language packs to the requested ref
+        if: inputs.languages_ref != ''
+        env:
+          REF: ${{ inputs.languages_ref }}
+        run: |
+          git -C kalulu-languages fetch --quiet origin "$REF"
+          git -C kalulu-languages checkout --quiet --detach FETCH_HEAD
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install the generator
+        run: |
+          python -m pip install --quiet --upgrade pip
+          python -m pip install --quiet ".[dev]"
+
+      - name: Run the tests
+        run: python -m pytest -q
+
+      - name: Build every language's booklets
+        id: build
+        run: |
+          mkdir -p dist build
+          locales=""
+          failed=""
+          # Every locale folder (xx_XX) with a language.db: fonts/ and schema/
+          # are not packs.
+          for pack in kalulu-languages/*/; do
+            locale="$(basename "$pack")"
+            [[ "$locale" =~ ^[a-z]{2}_[A-Z]{2}$ && -f "$pack/language.db" ]] || continue
+            locales="$locales $locale"
+            echo "::group::$locale"
+            kalulu-booklets build "$locale" --out build > "build/$locale.log" 2>&1 || failed="$failed $locale"
+            cat "build/$locale.log"
+            echo "::endgroup::"
+          done
+          if [[ -z "$locales" ]]; then
+            echo "::error::no language pack found in kalulu-languages/"
+            exit 1
+          fi
+          if [[ -n "$failed" ]]; then
+            echo "::error::the booklets of$failed could not be built; nothing is published"
+            exit 1
+          fi
+          # A release lists its files flat, so each language is one zip, with a
+          # folder inside: everything the generator wrote for it, plus its notes.
+          mkdir -p stage
+          for locale in $locales; do
+            folder="Kalulu-Booklets-$locale"
+            mkdir -p "stage/$folder"
+            cp -R "build/$locale/." "stage/$folder/"
+            cp "build/$locale.log" "stage/$folder/build-notes.txt"
+            (cd stage && zip -q -r -X "../dist/$folder.zip" "$folder")
+          done
+          echo "locales=${locales# }" >> "$GITHUB_OUTPUT"
+
+      - name: Write the release notes
+        id: notes
+        env:
+          LOCALES: ${{ steps.build.outputs.locales }}
+          LANGUAGES_REF: ${{ inputs.languages_ref }}
+        run: |
+          languages_commit="$(git -C kalulu-languages rev-parse HEAD)"
+          tag="booklets-$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          {
+            echo "The Kalulu reading booklets of every language pack, as PDF, A5 (148 × 210 mm): one zip per language."
+            echo
+            echo "| Language | Download | Booklets | Pages |"
+            echo "|---|---|---|---|"
+            for locale in $LOCALES; do
+              count="$(find "stage/Kalulu-Booklets-$locale" -name '*.pdf' | wc -l | tr -d ' ')"
+              pages="$(grep -oE '\(([0-9]+) pages' "build/$locale.log" | grep -oE '[0-9]+' | paste -sd ' ' -)"
+              echo "| \`$locale\` | \`Kalulu-Booklets-$locale.zip\` | $count | $pages |"
+            done
+            echo
+            echo "Built from:"
+            echo
+            echo "- the generator at ${GITHUB_SHA::7} (${GITHUB_REF_NAME})"
+            if [[ -n "$LANGUAGES_REF" ]]; then
+              echo "- Kalulu-Languages \`$LANGUAGES_REF\`, ${languages_commit::8}"
+            else
+              echo "- Kalulu-Languages ${languages_commit::8}, the commit this repository pins"
+            fi
+            echo
+            echo "What could not be printed as a pack asks (a word wider than its cell, sentences that do not fit, a letter a font lacks…) is listed in each zip's \`build-notes.txt\`."
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.notes.outputs.tag }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          if [[ "$PRERELEASE" == "true" ]]; then flags=(--prerelease --latest=false); else flags=(--latest); fi
+          gh release create "$TAG" dist/*.zip \
+            --target "$GITHUB_SHA" \
+            --title "Kalulu Booklets $(date -u +%Y-%m-%d)" \
+            --notes-file release-notes.md \
+            "${flags[@]}"
