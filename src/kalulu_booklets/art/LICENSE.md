@@ -20,3 +20,18 @@ are not used here.
 
 The fluency test's two stopwatches are not an image: the generator draws them
 (`layout._stopwatch()`).
+
+## The cover
+
+| File | Printed on |
+|---|---|
+| `kalulu-logo.svg` | the cover: the Kalulu logo, its rabbit standing in the "u" |
+| `cover-star.svg` | the cover: the star the booklet's number is printed on |
+
+Both are vector drawings taken from the cover of Excello's previous French
+reading booklets (`livret_1_france.pdf`, 2026-11-03, at the user's request):
+every filled path of that page except its text, unchanged, written out as SVG
+in points, the logo's cheeks and whisker dots at the opacity they are printed
+with there (0.2 and 0.39). The booklet's number is not part of the star: the
+generator prints it (`layout.Layout.cover()`). They are Excello's, under the same
+license as this repository.

@@ -38,6 +38,8 @@ class Version:
     # gets the French.
     labels: tuple[tuple[str, str], ...] = ()
     label_color: Color | None = None
+    # In bold, as the examples print the teacher's; else regular.
+    label_bold: bool = False
     writing: bool = True
     teacher: bool = False
     # Made up to a multiple of four pages with blank ones, for folded sheets.
@@ -63,7 +65,7 @@ class Version:
 BASE = Version("base", printed=True)
 TEACHER = Version("teacher", labels=(("fr", "Version enseignant"), ("es", "Versión docente"),
                                      ("pt", "Versão do professor")),
-                  label_color=HexColor("#29367e"), teacher=True, folded=False)
+                  label_color=HexColor("#29367e"), label_bold=True, teacher=True, folded=False)
 NO_WRITING = Version("no-writing", writing=False, printed=True)
 
 # The examples' "Version différenciée", each in its colour.

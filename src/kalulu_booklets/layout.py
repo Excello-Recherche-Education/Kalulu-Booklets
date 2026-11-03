@@ -23,6 +23,7 @@ from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen.canvas import Canvas
 
+from kalulu_booklets import vector
 from kalulu_booklets.content import CURSIVE, Booklet, ChapterContent, Paragraph, Styled, TableRow
 from kalulu_booklets.fonts import Face, Fonts, Spacing
 from kalulu_booklets.versions import BASE, Version
@@ -44,7 +45,6 @@ FOLIO = HexColor("#7a7a7a")  # page numbers
 TABLE_RULE = HexColor("#8a8a8a")
 BUBBLE = white  # the fluency bubble, white and outlined in black as in the printed booklets
 BUBBLE_EDGE = black
-STAR = HexColor("#f6c12e")
 SEYES_MAIN = HexColor("#9488d4")
 SEYES_FINE = HexColor("#d3cdef")
 SEYES_MARGIN = HexColor("#e2827f")
@@ -108,9 +108,23 @@ CATERPILLAR_HEIGHT = 9 * mm
 BUBBLE_TAIL = 8 * mm  # how far the fluency bubble's tail reaches down
 STOPWATCH = 5 * mm
 
+# The cover: the Kalulu logo, its rabbit in the "u", and the booklet's number in
+# white on a star, both drawn from the previous booklets (art/LICENSE.md) and
+# placed as there, centred across the page. Measured on the printed booklets
+# (2026-11-03): the logo 87 mm wide, its top 52.2 mm from the page's; the star
+# 27.2 mm across, its top 139.4 mm down; the number in Mulish Bold, 28.2 pt, its
+# baseline 155.8 mm down.
+COVER_LOGO_WIDTH = 87 * mm
+COVER_LOGO_TOP = PAGE_HEIGHT - 52.2 * mm
+COVER_STAR_WIDTH = 27.2 * mm
+COVER_STAR_TOP = PAGE_HEIGHT - 139.4 * mm
+COVER_NUMBER_SIZE = 28.2
+COVER_NUMBER_Y = PAGE_HEIGHT - 155.8 * mm
+
 # The cover's version line (versions.py), measured on the printed teacher and
-# adapted booklets: 20.7 pt, its baseline 178 mm from the top. They print it in
-# Mulish Light, which the packs do not have: the regular weight stands in.
+# adapted booklets: 20.7 pt, its baseline 178 mm from the top. The teacher's is
+# in Mulish Bold; the adapted ones are in Mulish Light, which the packs do not
+# have: the regular weight stands in.
 COVER_LABEL_SIZE = 20.7
 COVER_LABEL_Y = PAGE_HEIGHT - 178 * mm
 
@@ -188,18 +202,16 @@ class Layout:
     def cover(self) -> None:
         self.new_page(numbered=False)
         number = str(self.booklet.number)
-        black_face = self.fonts.script_black
+        bold = self.fonts.script_bold
         label = self.version.label(self.booklet.locale)
-        script = self.fonts.script
+        label_face = bold if self.version.label_bold else self.fonts.script
 
         def draw(canvas: Canvas) -> None:
-            _centered(canvas, black_face, "Kalulu", PAGE_HEIGHT * 0.72, 54, INK)
-            _star(canvas, PAGE_WIDTH / 2, PAGE_HEIGHT * 0.42, 40 * mm, 17 * mm, STAR)
-            size = 64
-            _centered(canvas, black_face, number,
-                      PAGE_HEIGHT * 0.42 - black_face.cap_height * size / 2, size, INK)
+            _vector(canvas, "kalulu-logo", COVER_LOGO_TOP, COVER_LOGO_WIDTH)
+            _vector(canvas, "cover-star", COVER_STAR_TOP, COVER_STAR_WIDTH)
+            _centered(canvas, bold, number, COVER_NUMBER_Y, COVER_NUMBER_SIZE, white)
             if label:
-                _centered(canvas, script, label, COVER_LABEL_Y, COVER_LABEL_SIZE, self.version.label_color or INK)
+                _centered(canvas, label_face, label, COVER_LABEL_Y, COVER_LABEL_SIZE, self.version.label_color or INK)
 
         self.add(draw)
 
@@ -653,6 +665,17 @@ def _image(name: str) -> ImageReader:
     return _IMAGES[name]
 
 
+_VECTORS: dict[str, vector.Vector] = {}
+
+
+def _vector(canvas: Canvas, name: str, top: float, width: float) -> None:
+    """One of the vector drawings of ``art/``, ``width`` wide, centred across
+    the page, its top at ``top``."""
+    if name not in _VECTORS:
+        _VECTORS[name] = vector.read(ART / f"{name}.svg")
+    _VECTORS[name].draw(canvas, (PAGE_WIDTH - width) / 2, top, width)
+
+
 def _bubble(canvas: Canvas, x: float, y: float, width: float, height: float, radius: float,
             tail_x: float, tail: float) -> None:
     """A rounded speech bubble whose tail points down at ``tail_x``."""
@@ -704,19 +727,6 @@ def _fit(face: Face, text: str, width: float) -> float:
 
 def _centered(canvas: Canvas, face: Face, text: str, baseline: float, size: float, color: object) -> None:
     face.draw(canvas, (PAGE_WIDTH - face.width(text, size)) / 2, baseline, text, size, color)
-
-
-def _star(canvas: Canvas, x: float, y: float, outer: float, inner: float, color: object) -> None:
-    path = canvas.beginPath()
-    for point in range(10):
-        radius = outer if point % 2 == 0 else inner
-        angle = math.pi / 2 + point * math.pi / 5
-        px, py = x + radius * math.cos(angle), y + radius * math.sin(angle)
-        path.moveTo(px, py) if point == 0 else path.lineTo(px, py)
-    path.close()
-    canvas.setFillColor(color)
-    canvas.setStrokeColor(white)
-    canvas.drawPath(path, stroke=0, fill=1)
 
 
 def _wrap(face: Face, paragraph: Paragraph, size: float, width: float,
