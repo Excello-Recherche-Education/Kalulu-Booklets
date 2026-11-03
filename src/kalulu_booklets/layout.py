@@ -109,7 +109,8 @@ BUBBLE_TAIL = 8 * mm  # how far the fluency bubble's tail reaches down
 STOPWATCH = 5 * mm
 
 # The cover's version line (versions.py), measured on the printed teacher and
-# adapted booklets: Mulish Light 20.7 pt, its baseline 178 mm from the top.
+# adapted booklets: 20.7 pt, its baseline 178 mm from the top. They print it in
+# Mulish Light, which the packs do not have: the regular weight stands in.
 COVER_LABEL_SIZE = 20.7
 COVER_LABEL_Y = PAGE_HEIGHT - 178 * mm
 
@@ -549,8 +550,8 @@ def write(booklet: Booklet, fonts: Fonts, path: Path, version: Version = BASE,
     canvas.save()
     if imposed_path is not None:
         canvas = _canvas(imposed_path, booklet, version, landscape(A4))
-        for left, right in imposition(len(pages)):
-            for index, shift in ((left, 0), (right, PAGE_WIDTH)):
+        for sheet_side in sheet_sides(len(pages)):
+            for index, shift in sheet_side:
                 canvas.saveState()
                 canvas.translate(shift, 0)
                 _draw_page(canvas, pages[index], folios[index], fonts)
@@ -558,6 +559,14 @@ def write(booklet: Booklet, fonts: Fonts, path: Path, version: Version = BASE,
             canvas.showPage()
         canvas.save()
     return len(pages)
+
+
+def sheet_sides(count: int) -> list[tuple[tuple[int, float], tuple[int, float]]]:
+    """Each A4 side's two pages (0-based) with how far from the sheet's left
+    edge each is drawn: two A5 pages are 296 mm across a 297 mm sheet, so the
+    pair is centred, and the fold falls in the middle on both sides."""
+    margin = (landscape(A4)[0] - 2 * PAGE_WIDTH) / 2
+    return [((left, margin), (right, margin + PAGE_WIDTH)) for left, right in imposition(count)]
 
 
 def imposition(count: int) -> list[tuple[int, int]]:

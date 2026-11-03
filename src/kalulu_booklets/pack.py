@@ -200,11 +200,15 @@ class Pack:
         if gp is None:
             return None
         folder = self.path.parent / LOOK_AND_LEARN_IMAGES
+        # Names are matched against the folder's listing, letter case included:
+        # macOS's disks ignore case, so asking for "o-O.png" there would find
+        # "o-o.png", another sound's picture, where Linux finds nothing.
+        files = {path.name for path in folder.iterdir()} if folder.is_dir() else set()
         for name in (f"{_file_name(gp.grapheme)}-{_file_name(gp.phoneme)}", f"{gp.grapheme}-{gp.phoneme}"):
             for form in ("NFC", "NFD"):
-                path = folder / f"{unicodedata.normalize(form, name)}.png"
-                if path.is_file() and _is_png(path):
-                    return path
+                file = f"{unicodedata.normalize(form, name)}.png"
+                if file in files and _is_png(folder / file):
+                    return folder / file
         return None
 
     def booklets(self) -> list[int]:

@@ -94,3 +94,50 @@ def test_a_made_chapter_takes_its_first_gp_with_a_picture(pack_folder):
     _picture(pack_folder, "n-n.png")
     made = {chapter.lesson: chapter for chapter in load(pack_folder).chapters}
     assert made[3].image_gp_id == 4 and made[1].image_gp_id is None
+
+
+def test_the_a4_sheet_centres_its_two_pages():
+    # Two A5 pages (296 mm) on an A4 sheet (297 mm): half a millimetre each side.
+    margin = (layout.landscape(layout.A4)[0] - 2 * layout.PAGE_WIDTH) / 2
+    assert margin == pytest.approx(0.5 * layout.mm, abs=0.01)
+    assert layout.sheet_sides(4) == [((3, margin), (0, margin + layout.PAGE_WIDTH)),
+                                     ((1, margin), (2, margin + layout.PAGE_WIDTH))]
+
+
+def test_a_picture_name_matches_its_letter_case(pack_folder):
+    # Open o: only the closed o's picture is there, and a disk that ignores
+    # case must not hand it over.
+    execute(pack_folder, "INSERT INTO GPs (ID, Grapheme, Phoneme, Type) VALUES (9, 'o', 'O', 1)")
+    _picture(pack_folder, "o-o.png")
+    assert load(pack_folder).picture(9) is None
+
+
+def test_the_no_writing_version_closes_on_folded_sheets(pack_folder):
+    chapter = add_chapter(pack_folder, 2, [2], Title="L l")
+    execute(pack_folder, "INSERT INTO BookletEntries (ChapterID, Part, Position, Text, Text2, Header) "
+                         "VALUES (?, 3, 0, 'la', '', 0)", chapter)
+    assert len(_pages(pack_folder, NO_WRITING)) % 4 == 0
+
+
+def test_the_teacher_version_keeps_the_base_page_numbers(pack_folder):
+    _picture(pack_folder, "l-l.png")
+    add_chapter(pack_folder, 2, [2], Title="L l", ImageGPID=2)
+    base, teacher = _pages(pack_folder, BASE), _pages(pack_folder, TEACHER)
+    numbers = lambda pages: [folio for folio, page in zip(layout._folios(pages), pages)  # noqa: E731
+                             if page.steps and page.numbered and not page.shares_next_number]
+    assert numbers(teacher) == numbers(base)[:len(numbers(teacher))]
+
+
+def test_a_note_names_the_versions_that_gave_it_once_each(pack_folder, tmp_path, capsys):
+    # A word too wide for its cell, among the words and in the fluency test:
+    # each version notes it twice.
+    chapter = add_chapter(pack_folder, 2, [2], Title="L l")
+    for part in (2, 5):
+        execute(pack_folder, "INSERT INTO BookletEntries (ChapterID, Part, Position, Text, Text2, Header) "
+                             "VALUES (?, ?, 0, 'lalalalalalalalalalalala', '', 0)", chapter, part)
+    out = tmp_path / "out"
+    assert main(["build", str(pack_folder), "--version", "base", "--version", "teacher", "--version", "base",
+                 "--out", str(out)]) == 0
+    said = capsys.readouterr().out
+    assert "base, base" not in said
+    assert [line for line in said.splitlines() if "lalala" in line and "[" in line] == []

@@ -64,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
               f"it has {', '.join(map(str, pack.booklets())) or 'none'}", file=sys.stderr)
         return 2
 
-    versions = [VERSIONS[name] for name in arguments.version or VERSIONS]
+    versions = [VERSIONS[name] for name in dict.fromkeys(arguments.version or VERSIONS)]
     if any(version.teacher for version in versions) and not any(
             pack.picture(chapter.image_gp_id) for chapter in pack.chapters):
         print(f"{pack.locale}: no Look & Learn image found (not checked out?): the teacher version has no teacher page")
@@ -83,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{path}  ({pages} pages, {len(booklet.chapters)} chapter(s))")
             if imposed is not None:
                 print(f"{imposed}  ({pages // 2} A4 sheet sides, for printing)")
-            for note in booklet.notes:
+            for note in dict.fromkeys(booklet.notes):
                 said.setdefault(note, []).append(version.name)
         for note, by in said.items():
             which = "" if len(by) == len(versions) else f" [{', '.join(by)}]"
