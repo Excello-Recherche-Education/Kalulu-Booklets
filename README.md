@@ -14,7 +14,9 @@ educational app that helps children learn to read through the decoding
 > defines, in six versions: the base booklet, the teacher's, one without writing
 > pages, and three adapted for pupils with dyslexia, dyspraxia or attention
 > difficulties; the base and no-writing ones also imposed for printing. The
-> covers' artwork is still to come. The pages carry the game's characters: the parakeet under the
+> cover carries the Kalulu logo, its rabbit in the "u", and the booklet's number
+> on a star, as the previous booklets did; the back cover's artwork is still to
+> come. The pages carry the game's characters: the parakeet under the
 > fluency test's speech bubble, beside two stopwatches, the penguin above the
 > tables and the caterpillar on the writing pages (`src/kalulu_booklets/art/`,
 > whose `LICENSE.md` says where each comes from).
