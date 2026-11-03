@@ -11,10 +11,11 @@ change is how the pages are made:
 - **no-writing** — without its writing pages;
 - **dyslexia**, **dyspraxia**, **adhd** — the "versions différenciées" of the
   examples, for pupils with those difficulties: bigger and airier text, a
-  chapter over several pages, a shorter fluency test, an "adaptations" page
-  saying what was changed; dyspraxia also prints everything in script with no
-  writing pages, and dyspraxia and adhd colour the multi-letter graphemes
-  (adapted.py, and Kalulu-Main's docs/booklet-versions/ for the measurements).
+  chapter over several pages, a fluency test in 3 columns, an "adaptations"
+  page saying what was changed; dyspraxia also prints everything but its
+  writing pages in script, dyspraxia and adhd colour the multi-letter
+  graphemes, and adhd draws no animal (adapted.py, and Kalulu-Main's
+  docs/booklet-versions/ for the measurements).
 
 The base and no-writing versions are also written for printing: A4 landscape,
 two A5 pages a sheet, in the order a folded and stapled booklet reads them.
@@ -71,7 +72,6 @@ _AIRIER = ("font", "word spacing", "letter spacing", "line spacing")
 DYSLEXIA = Version("dyslexia", labels=ADAPTED, label_color=HexColor("#f7931d"), adapted="dyslexia",
                    adaptations=_AIRIER, readers=(("fr", "aux élèves dyslexiques"),))
 DYSPRAXIA = Version("dyspraxia", labels=ADAPTED, label_color=HexColor("#24aae1"), adapted="dyspraxia",
-                    writing=False,
                     adaptations=_AIRIER + ("fewer items", "graphemes coloured", "silent letters coloured",
                                            "script only"),
                     readers=(("fr", "aux élèves dyspraxiques"),))

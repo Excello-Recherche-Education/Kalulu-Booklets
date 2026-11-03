@@ -13,9 +13,13 @@ printed examples (Kalulu-Main's docs/booklet-versions/):
 - words in two columns or one per line, centred;
 - the multi-letter graphemes coloured, and every silent letter grey (dyspraxia,
   adhd);
-- 24 of the fluency test's items, on two pages of 3 × 4;
+- the fluency test's items in 3 columns, on as many pages of 3 × 4 as they
+  take (the PO's rule, 2026-11-03: the examples' cut to 24 items is not kept);
 - a sentence table one column per page;
-- writing pages on a wider ruling, the copies drawn as outlines to trace over;
+- writing pages on a wider ruling, the copies drawn as outlines to trace over,
+  in dyspraxia too: its only cursive (the PO's rule, 2026-11-03);
+- no animal drawn in adhd: no penguin above the tables, no caterpillar on the
+  writing pages;
 - the page number bottom right, and an "adaptations" page before the back
   cover saying what this version changes.
 
@@ -89,6 +93,7 @@ class Style:
     story_line: float
     story_paragraph: float  # from a paragraph's last line to the next one's first
     fluency_size: float = 24
+    animals: bool = True  # the penguin above the tables, the caterpillar on the writing pages
 
 
 STYLES = {
@@ -108,7 +113,8 @@ STYLES = {
         all_silent=True, one_sentence_a_line=False, title_sizes={1: 40, 2: 36, 3: 30},
         first=22, last=186, line=17.6, cursive_line=17.6, block=42.3, after_title=27,
         syllable_row=19.75, after_syllables=32, word_row=19.75, word_centres=(1 / 2,),
-        table_row=25, table_cells=42.3, story_size=24, story_title_size=24, story_line=17.6, story_paragraph=35.3),
+        table_row=25, table_cells=42.3, story_size=24, story_title_size=24, story_line=17.6, story_paragraph=35.3,
+        animals=False),
 }
 
 # The most columns for which the widest syllable fits its cell with 0.3 em to
@@ -120,7 +126,6 @@ SYLLABLE_SPARE = 0.3
 FLUENCY_COLUMNS = (29.5, 74.0, 118.6)  # centres, from the left
 FLUENCY_ROWS = (63.1, 93.0, 123.0, 153.0)  # baselines, from the top
 FLUENCY_BOX = (4.2, 35.8, 143.8, 174.2)  # left, top, right, bottom
-FLUENCY_KEPT = 3  # of each row of 5
 STOPWATCH = 9.5
 STOPWATCH_TOP = 184  # the first one's centre, below the box
 
@@ -159,9 +164,6 @@ ADAPTATIONS_TEXT = {
             "silent letters coloured": "Coloration des graphèmes silencieux",
             "script only": "Utiliser uniquement une police script",
         },
-        "no writing": "De plus, il n’y a pas de lignes d’écriture dans ces livrets car l’écriture n’est pas un moyen "
-                      "d’apprentissage chez la plupart des élèves dyspraxiques. Si vous voulez en ajouter, nous vous "
-                      "conseillons de suivre les conseils de l’association Le Cartable Fantastique.",
         "closing": ("Si on suit les données scientifiques sur le sujet, nous conseillons ces adaptations {readers}.",
                     "N’hésitez pas à nous envoyer vos commentaires à contact@excellolab.org."),
     },
@@ -169,16 +171,6 @@ ADAPTATIONS_TEXT = {
 ADAPTATIONS_SIZE = 11
 ADAPTATIONS_LINE = 6.2
 ADAPTATIONS_ROW = 8.5
-
-
-def fluency_items(items: list[Styled]) -> list[Styled]:
-    """The 24 items of a fluency test: the base's are rows of 5, and the first
-    3 of rows 1-4 and of rows 7-10 are kept, its easier and its harder half. A
-    shorter test keeps the first 3 of each of its rows, at most 24."""
-    rows = [items[start:start + 5] for start in range(0, len(items), 5)]
-    if len(rows) >= 10:
-        rows = rows[0:4] + rows[6:10]
-    return [item for row in rows for item in row[:FLUENCY_KEPT]][:24]
 
 
 @dataclass
@@ -416,7 +408,7 @@ class AdaptedLayout(Layout):
             return
         self.new_page()
         style, size = self.style, self.style.size
-        if with_penguin:
+        if with_penguin and style.animals:
             self.add(lambda canvas: _picture(canvas, "penguin", PAGE_WIDTH / 2, _top(8), PENGUIN_HEIGHT * 1.25,
                                              centered=True))
             # The first row's baseline 0.6 of a row under the penguin.
@@ -507,7 +499,8 @@ class AdaptedLayout(Layout):
 
             def draw(canvas: Canvas, page_rows=page_rows) -> None:
                 _ruling(canvas, verticals)
-                _picture(canvas, "caterpillar", 6 * mm, _top(4), CATERPILLAR_HEIGHT * mm)
+                if self.style.animals:
+                    _picture(canvas, "caterpillar", 6 * mm, _top(4), CATERPILLAR_HEIGHT * mm)
                 for baseline, row in zip(model_lines, page_rows):
                     for x, text, traced in row:
                         if traced:
@@ -518,12 +511,12 @@ class AdaptedLayout(Layout):
             self.add(draw)
 
     def fluency(self, content: ChapterContent, items: list[Styled]) -> None:
-        kept = fluency_items(items)
+        """Every item, in reading order, 3 a row and 4 rows a page."""
         face, size = self.fonts.script, self.style.fluency_size
         per_page = len(FLUENCY_COLUMNS) * len(FLUENCY_ROWS)
-        for start in range(0, len(kept), per_page):
+        for start in range(0, len(items), per_page):
             self.new_page()
-            chunk = kept[start:start + per_page]
+            chunk = items[start:start + per_page]
 
             def draw(canvas: Canvas, chunk: list[Styled] = chunk) -> None:
                 left, top, right, bottom = FLUENCY_BOX
@@ -563,8 +556,7 @@ class AdaptedLayout(Layout):
         table_top = y - line / 2
         rows = [(text["rows"][key], key in self.version.adaptations) for key in ADAPTATIONS]
         after = table_top - (len(rows) + 1) * ADAPTATIONS_ROW * mm - line
-        tail = [text["no writing"]] if not self.version.writing and "no writing" in text else []
-        tail.extend(piece.format(readers=readers).replace(" .", ".") for piece in text["closing"])
+        tail = [piece.format(readers=readers).replace(" .", ".") for piece in text["closing"]]
         for piece in tail:
             more, after = paragraph(piece, after)
             lines.extend(more)

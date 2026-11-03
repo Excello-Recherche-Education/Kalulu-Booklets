@@ -1,10 +1,13 @@
 """The adapted versions (adapted.py): Dyslexie, Dyspraxie and TDAH."""
 
+import io
+
 import pytest
+from reportlab.pdfgen.canvas import Canvas
 
 from conftest import add_chapter, execute
-from kalulu_booklets import content, fonts, layout
-from kalulu_booklets.adapted import AdaptedLayout, fluency_items
+from kalulu_booklets import adapted, content, fonts, layout
+from kalulu_booklets.adapted import AdaptedLayout
 from kalulu_booklets.content import EARLIER, OWN, TOUCHING, Styled
 from kalulu_booklets.pack import load
 from kalulu_booklets.versions import ADHD, BASE, DYSLEXIA, DYSPRAXIA
@@ -42,11 +45,14 @@ def test_a_chapter_colours_its_own_graphemes_and_earlier_ones(pack_folder):
     assert content.styled(pack, "chou", False, chapter=lesson_2).tints == ((0, 2, OWN),)
 
 
-def test_the_fluency_test_keeps_its_easier_and_harder_halves():
+@pytest.mark.parametrize("version", [DYSLEXIA, DYSPRAXIA, ADHD])
+def test_the_fluency_test_keeps_every_item_on_pages_of_3_by_4(pack_folder, version):
+    laid_out = _layout(pack_folder, version)
     items = [Styled(str(index)) for index in range(50)]
-    kept = [int(item.text) for item in fluency_items(items)]
-    assert kept == [0, 1, 2, 5, 6, 7, 10, 11, 12, 15, 16, 17, 30, 31, 32, 35, 36, 37, 40, 41, 42, 45, 46, 47]
-    assert len(fluency_items(items[:20])) == 12
+    before = len(laid_out.pages)
+    laid_out.fluency(None, items)
+    # 50 items, 12 a page: 5 pages, the last holding 2.
+    assert len(laid_out.pages) - before == 5
 
 
 def test_an_adapted_version_prints_the_sentences_the_base_chose(pack_folder):
@@ -88,9 +94,32 @@ def test_french_has_the_adaptations_page(pack_folder):
     assert not pages[-2].numbered and pages[-2].steps
 
 
-def test_dyspraxia_has_no_writing_page(pack_folder):
+def _pictures_drawn(laid_out, monkeypatch):
+    drawn = []
+    monkeypatch.setattr(adapted, "_picture", lambda canvas, name, *rest, **options: drawn.append(name))
+    canvas = Canvas(io.BytesIO())
+    for page in laid_out.run():
+        for step in page.steps:
+            step(canvas)
+    return drawn
+
+
+def _writing_and_table(pack_folder):
     chapter = add_chapter(pack_folder, 2, [2], Title="L l", SyllableCount=0, WordCount=0, SentencePages=-1)
     execute(pack_folder, "INSERT INTO BookletEntries (ChapterID, Part, Position, Text, Text2, Header) "
                          "VALUES (?, 3, 0, 'la', '', 0)", chapter)
+    for position, (left, right, header) in enumerate((("a", "b", 1), ("la", "le", 0))):
+        execute(pack_folder, "INSERT INTO BookletEntries (ChapterID, Part, Position, Text, Text2, Header) "
+                             "VALUES (?, 4, ?, ?, ?, ?)", chapter, position, left, right, header)
+
+
+def test_dyspraxia_keeps_the_writing_pages(pack_folder):
+    _writing_and_table(pack_folder)
     used = lambda version: sum(1 for page in _layout(pack_folder, version).run() if page.steps)  # noqa: E731
-    assert used(DYSPRAXIA) == used(ADHD) - 1
+    assert used(DYSPRAXIA) == used(ADHD)
+
+
+def test_adhd_draws_no_animal(pack_folder, monkeypatch):
+    _writing_and_table(pack_folder)
+    assert set(_pictures_drawn(_layout(pack_folder, DYSPRAXIA), monkeypatch)) == {"penguin", "caterpillar"}
+    assert _pictures_drawn(_layout(pack_folder, ADHD), monkeypatch) == []

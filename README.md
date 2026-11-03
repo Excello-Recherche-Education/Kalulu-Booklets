@@ -125,17 +125,17 @@ only ever read.
 
 Every booklet is written in each of its **versions**, one folder per version under
 `build/<locale>/`. Every version has the same content; only the pages differ (an
-adapted version cuts only the fluency test, and prints the sentences the base
-booklet chose for a chapter that picks none):
+adapted version prints the sentences the base booklet chose for a chapter that
+picks none):
 
 | Version | Folder, file | What changes |
 |---|---|---|
 | base | `base/<locale>-booklet-<n>.pdf` | the booklet itself |
 | teacher | `teacher/<locale>-booklet-<n>-teacher.pdf` | before each chapter, a page with its title and its picture (the Look & Learn image the chapter names), under the same page number as the chapter page, so that a teacher's copy and the pupils' agree. "Version enseignant" on the cover |
 | no writing pages | `no-writing/<locale>-booklet-<n>-no-writing.pdf` | without its writing pages |
-| dyslexia | `dyslexia/<locale>-booklet-<n>-dyslexia.pdf` | bigger, airier text: script at 20 pt with letter and word spacing, more space between lines; words in two columns; a chapter over several pages, its sentences on pages of their own; a shorter fluency test (24 items); a writing ruling with wider lines; page numbers bottom right. "Version différenciée" on the cover, and an adaptations page before the back cover saying what changed |
-| dyspraxia | `dyspraxia/<locale>-booklet-<n>-dyspraxia.pdf` | as dyslexia, at 24 pt, words one per line, in script only and with no writing pages; the multi-letter graphemes coloured (the chapter's own orange, earlier ones indigo, dark red where two touch and for "qu") and every silent letter grey |
-| adhd | `adhd/<locale>-booklet-<n>-adhd.pdf` | as dyspraxia, with the cursive and the writing pages kept |
+| dyslexia | `dyslexia/<locale>-booklet-<n>-dyslexia.pdf` | bigger, airier text: script at 20 pt with letter and word spacing, more space between lines; words in two columns; a chapter over several pages, its sentences on pages of their own; the fluency test in 3 columns, every item, over as many pages as it takes; a writing ruling with wider lines; page numbers bottom right. "Version différenciée" on the cover, and an adaptations page before the back cover saying what changed |
+| dyspraxia | `dyspraxia/<locale>-booklet-<n>-dyspraxia.pdf` | as dyslexia, at 24 pt, words one per line, in script only but for its writing pages, which keep their cursive models; the multi-letter graphemes coloured (the chapter's own orange, earlier ones indigo, dark red where two touch and for "qu") and every silent letter grey |
+| adhd | `adhd/<locale>-booklet-<n>-adhd.pdf` | as dyspraxia, with the cursive kept, and no animal drawn: no penguin above the tables, no caterpillar on the writing pages |
 
 The base and no-writing versions are also written **for printing**, as
 `…-print.pdf`: A4 landscape, two A5 pages a side, in saddle-stitch order (the last
