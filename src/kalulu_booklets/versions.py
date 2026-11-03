@@ -6,7 +6,8 @@ change is how the pages are made:
 
 - **base** — the booklet itself;
 - **teacher** — before each chapter, a page with its title and its picture (the
-  Look & Learn image of the chapter's ``ImageGPID``), carrying the same page
+  pack's own booklet image the chapter's ``ImageID`` names, else the Look &
+  Learn image of its ``ImageGPID``), carrying the same page
   number as the chapter page, so a teacher's copy and a pupil's agree;
 - **no-writing** — without its writing pages;
 - **dyslexia**, **dyspraxia**, **adhd** — the "versions différenciées" of the

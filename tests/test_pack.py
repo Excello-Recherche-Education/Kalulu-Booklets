@@ -11,9 +11,9 @@ def test_refuses_another_schema_version(tmp_path):
         load(make_pack(tmp_path, version=1))
 
 
-def test_refuses_version_3(tmp_path):
-    with pytest.raises(PackError, match="schema version 3; this generator reads version 4"):
-        load(make_pack(tmp_path, version=3))
+def test_refuses_version_4(tmp_path):
+    with pytest.raises(PackError, match="schema version 4; this generator reads version 5"):
+        load(make_pack(tmp_path, version=4))
 
 
 def test_reads_the_fonts_that_replace_the_defaults(pack_folder):

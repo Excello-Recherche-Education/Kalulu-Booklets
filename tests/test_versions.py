@@ -141,3 +141,41 @@ def test_a_note_names_the_versions_that_gave_it_once_each(pack_folder, tmp_path,
     said = capsys.readouterr().out
     assert "base, base" not in said
     assert [line for line in said.splitlines() if "lalala" in line and "[" in line] == []
+
+
+def _booklet_image(pack_folder, file="puits.png", picture=True):
+    folder = pack_folder / "booklet_images"
+    folder.mkdir(exist_ok=True)
+    if picture:
+        Image.new("RGB", (40, 30), "brown").save(folder / file)
+    else:
+        (folder / file).write_text("version https://git-lfs.github.com/spec/v1\n")
+    execute(pack_folder, "INSERT INTO BookletImages (ID, Name, File) VALUES (1, 'Puits', ?)", file)
+
+
+def test_a_chapter_shows_its_own_booklet_image_on_the_teacher_page(pack_folder):
+    # Lesson 2 teaches "l", which has no Look & Learn image here: the chapter
+    # names a picture of the pack's own instead.
+    _booklet_image(pack_folder)
+    add_chapter(pack_folder, 2, [2], Title="L l", ImageID=1)
+    pack = load(pack_folder)
+    chapter = next(chapter for chapter in pack.chapters if chapter.lesson == 2)
+    assert pack.chapter_picture(chapter) == pack_folder / "booklet_images" / "puits.png"
+    assert sum(page.shares_next_number for page in _pages(pack_folder, TEACHER)) == 1
+
+
+def test_a_booklet_image_not_checked_out_leaves_the_teacher_page_out_and_says_so(pack_folder):
+    _booklet_image(pack_folder, picture=False)
+    add_chapter(pack_folder, 2, [2], Title="L l", ImageID=1)
+    booklet = content.booklet(load(pack_folder), 1)
+    assert not any(page.shares_next_number for page in layout.Layout(booklet, fonts.load(fonts.PINNED), TEACHER).run())
+    assert any("booklet_images/puits.png cannot be printed" in note for note in booklet.notes)
+
+
+def test_a_chapter_without_a_booklet_image_keeps_its_gp_picture(pack_folder):
+    _picture(pack_folder, "l-l.png")
+    _booklet_image(pack_folder)
+    add_chapter(pack_folder, 2, [2], Title="L l", ImageGPID=2)
+    pack = load(pack_folder)
+    chapter = next(chapter for chapter in pack.chapters if chapter.lesson == 2)
+    assert pack.chapter_picture(chapter).name == "l-l.png"

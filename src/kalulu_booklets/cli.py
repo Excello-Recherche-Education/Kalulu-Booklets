@@ -66,8 +66,9 @@ def main(argv: list[str] | None = None) -> int:
 
     versions = [VERSIONS[name] for name in dict.fromkeys(arguments.version or VERSIONS)]
     if any(version.teacher for version in versions) and not any(
-            pack.picture(chapter.image_gp_id) for chapter in pack.chapters):
-        print(f"{pack.locale}: no Look & Learn image found (not checked out?): the teacher version has no teacher page")
+            pack.chapter_picture(chapter) for chapter in pack.chapters):
+        print(f"{pack.locale}: no Look & Learn or booklet image found (not checked out?): "
+              "the teacher version has no teacher page")
     notes: list[str] = []
     for number in numbers:
         # The content is the same in every version; only the layout differs.
