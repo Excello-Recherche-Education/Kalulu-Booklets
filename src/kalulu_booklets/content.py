@@ -121,8 +121,9 @@ class ChapterContent:
     # The pool's sentences that hold one of the chapter's GPs: the others are
     # earlier lessons' content, taken only to fill the pages.
     sentences_teaching: frozenset[int] = frozenset()
-    # The Look & Learn image of the chapter's ImageGPID, for the teacher's page;
-    # None when it has none, or the pack's images are not checked out.
+    # The chapter's picture for the teacher's page: its own booklet image, else
+    # the Look & Learn image of its ImageGPID; None when it has none, or the
+    # pack's images are not checked out.
     picture: Path | None = None
 
     def is_empty(self) -> bool:
@@ -160,6 +161,10 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
     grey = chapter.grey_silent
     uppercase = float(setting("UppercaseProportion"))
 
+    if chapter.image_id is not None and pack.chapter_picture(chapter) is None:
+        image = pack.images.get(chapter.image_id)
+        notes.append(f"its booklet image {f'booklet_images/{image.file}' if image else chapter.image_id} cannot be "
+                     "printed: missing, not a PNG or JPEG, or not checked out (Git LFS); its teacher page is left out")
     syllables = _picked(pack, chapter, packs.SYLLABLES, int(setting("SyllableCount")), notes)
     words = _picked(pack, chapter, packs.WORDS, int(setting("WordCount")), notes)
     # -1 prints no sentence at all.
@@ -192,7 +197,7 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
                                         for paragraph in _story_paragraphs(story.text)])
                  for story in chapter.stories],
         sentences_teaching=frozenset(teaching),
-        picture=pack.picture(chapter.image_gp_id),
+        picture=pack.chapter_picture(chapter),
     )
 
 

@@ -16,7 +16,7 @@ from pathlib import Path
 
 from kalulu_booklets.text import lower
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # GPs.Type: 0 silent, 1 vowel, 2 consonant.
 SILENT, VOWEL, CONSONANT = 0, 1, 2
@@ -44,6 +44,8 @@ SETTINGS = (
 # "e-e" stay two files on a filesystem that folds case.
 _SYMBOL_NAMES = {"#": "sharp", "@": "at", "*": "star", "$": "usd", "%": "pcent", "§": "para"}
 LOOK_AND_LEARN_IMAGES = Path("look_and_learn") / "images"
+# The pack's own pictures for the teacher's booklet (BookletImages).
+BOOKLET_IMAGES = Path("booklet_images")
 
 
 def _is_png(path: Path) -> bool:
@@ -51,6 +53,13 @@ def _is_png(path: Path) -> bool:
     small text files under the images' names."""
     with path.open("rb") as file:
         return file.read(8) == b"\x89PNG\r\n\x1a\n"
+
+
+def _is_picture(path: Path) -> bool:
+    """A PNG or a JPEG, not a Git LFS pointer left in its place."""
+    with path.open("rb") as file:
+        start = file.read(8)
+    return start == b"\x89PNG\r\n\x1a\n" or start.startswith(b"\xff\xd8\xff")
 
 
 def _file_name(text: str) -> str:
@@ -121,6 +130,16 @@ class BookletFont:
 
 
 @dataclass(frozen=True)
+class BookletImage:
+    """A picture of the pack's own for the teacher's booklet: a file of the
+    pack's booklet_images/, for a chapter whose sound has no Look & Learn
+    image."""
+
+    name: str
+    file: str  # its path inside booklet_images/, folders separated by "/"
+
+
+@dataclass(frozen=True)
 class Entry:
     """A line of a chapter's hand-written lists (BookletEntries)."""
 
@@ -153,6 +172,9 @@ class Chapter:
     # Column -> value, for the columns the chapter sets itself.
     overrides: dict[str, float]
     gp_ids: list[int] = field(default_factory=list)
+    # The pack's own picture for the teacher's page (BookletImages), which
+    # takes the place of the ImageGPID one.
+    image_id: int | None = None
     sentences: list[BookletSentence] = field(default_factory=list)
     # Part -> entries, in order. A part listed here replaces the automatic choice.
     entries: dict[int, list[Entry]] = field(default_factory=dict)
@@ -179,6 +201,7 @@ class Pack:
     syllables_by_text: dict[str, list[int]]
     # Role (FONT_COLUMNS) -> the font replacing its default, for those replaced.
     fonts: dict[str, BookletFont] = field(default_factory=dict)
+    images: dict[int, BookletImage] = field(default_factory=dict)
     # The lessons that had no chapter, whose forced chapter is made here
     # (default_chapters()): every one of them for a pack with no chapter.
     made_chapters_for: list[int] = field(default_factory=list)
@@ -210,6 +233,18 @@ class Pack:
                 if file in files and _is_png(folder / file):
                     return folder / file
         return None
+
+    def chapter_picture(self, chapter: Chapter) -> Path | None:
+        """A chapter's picture on the teacher's page: its own booklet image
+        when it names one, else its ImageGPID's Look & Learn image. None when
+        it has neither, or the file is missing or a Git LFS pointer."""
+        if chapter.image_id is None:
+            return self.picture(chapter.image_gp_id)
+        image = self.images.get(chapter.image_id)
+        if image is None:
+            return None
+        path = self.path.parent / BOOKLET_IMAGES / Path(*image.file.split("/"))
+        return path if path.is_file() and _is_picture(path) else None
 
     def booklets(self) -> list[int]:
         return sorted({chapter.booklet for chapter in self.chapters})
@@ -272,13 +307,15 @@ def _load(db: sqlite3.Connection, path: Path) -> Pack:
                      for font in db.execute("SELECT ID, Name, File FROM BookletFonts")}
     fonts = {role: booklet_fonts[row[column]] for role, column in FONT_COLUMNS.items()
              if row[column] is not None and row[column] in booklet_fonts}
+    images = {image["ID"]: BookletImage(image["Name"], image["File"])
+              for image in db.execute("SELECT ID, Name, File FROM BookletImages")}
 
     chapters: dict[int, Chapter] = {}
     for row in db.execute("SELECT * FROM BookletChapters"):
         chapters[row["ID"]] = Chapter(
             id=row["ID"], lesson=lesson_numbers.get(row["LessonID"], 0), position=row["Position"],
             booklet=row["Booklet"], title=row["Title"], image_gp_id=row["ImageGPID"],
-            grey_silent=bool(row["GreySilent"]),
+            grey_silent=bool(row["GreySilent"]), image_id=row["ImageID"],
             overrides={column: row[column] for column in SETTINGS if row[column] is not None})
     for row in db.execute("SELECT ChapterID, GPID FROM BookletChapterGPs ORDER BY ID"):
         if row["ChapterID"] in chapters:
@@ -304,7 +341,7 @@ def _load(db: sqlite3.Connection, path: Path) -> Pack:
         locale=path.parent.name, path=path, gps=gps, words=words, syllables=syllables,
         sentences=sentences, settings=settings,
         chapters=sorted(chapters.values(), key=lambda chapter: (chapter.lesson, chapter.position, chapter.id)),
-        words_by_text=_by_text(words), syllables_by_text=_by_text(syllables), fonts=fonts,
+        words_by_text=_by_text(words), syllables_by_text=_by_text(syllables), fonts=fonts, images=images,
         made_chapters_for=[chapter.lesson for chapter in made])
     # A made chapter's teacher picture: the first of its GPs with a Look & Learn
     # image, as the Prof Tool's BookletData.first_gp_with_image() chooses it.

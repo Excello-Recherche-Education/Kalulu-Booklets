@@ -131,7 +131,7 @@ picks none):
 | Version | Folder, file | What changes |
 |---|---|---|
 | base | `base/<locale>-booklet-<n>.pdf` | the booklet itself |
-| teacher | `teacher/<locale>-booklet-<n>-teacher.pdf` | before each chapter, a page with its title and its picture (the Look & Learn image the chapter names), under the same page number as the chapter page, so that a teacher's copy and the pupils' agree. "Version enseignant" on the cover |
+| teacher | `teacher/<locale>-booklet-<n>-teacher.pdf` | before each chapter, a page with its title and its picture (the pack's own booklet image the chapter names, from its `booklet_images/`, else the Look & Learn image of the GP it names), under the same page number as the chapter page, so that a teacher's copy and the pupils' agree. "Version enseignant" on the cover |
 | no writing pages | `no-writing/<locale>-booklet-<n>-no-writing.pdf` | without its writing pages |
 | dyslexia | `dyslexia/<locale>-booklet-<n>-dyslexia.pdf` | bigger, airier text: script at 20 pt with letter and word spacing, more space between lines; words in two columns; a chapter over several pages, its sentences on pages of their own; the fluency test in 3 columns, every item, over as many pages as it takes; a writing ruling with wider lines; page numbers bottom right. "Version différenciée" on the cover, and an adaptations page before the back cover saying what changed |
 | dyspraxia | `dyspraxia/<locale>-booklet-<n>-dyspraxia.pdf` | as dyslexia, at 24 pt, words one per line, in script only but for its writing pages, which keep their cursive models; the multi-letter graphemes coloured (the chapter's own orange, earlier ones indigo, dark red where two touch and for "qu") and every silent letter grey |
