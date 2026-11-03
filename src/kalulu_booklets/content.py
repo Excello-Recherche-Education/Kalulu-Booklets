@@ -420,34 +420,38 @@ def _gp_spans(pack: Pack, item: Item, spelling: str) -> list[tuple[int, int, int
     return spans if position == len(spelling) else []
 
 
-def _silent_offsets(pack: Pack, item: Item, spelling: str) -> list[int]:
-    """Positions in ``spelling`` of the letters ``item``'s silent GPs spell."""
-    return _silent_of(pack, _gp_spans(pack, item, spelling))
-
-
 def _silent_of(pack: Pack, spans: list[tuple[int, int, int]]) -> list[int]:
     return [offset for start, end, gp_id in spans if pack.gps[gp_id].silent for offset in range(start, end)]
 
 
 def _tints(pack: Pack, spans: list[tuple[int, int, int]], chapter: Chapter) -> list[tuple[int, int, str]]:
-    """The multi-letter graphemes of a word to colour, as the examples colour
-    them (Kalulu-Main's docs/booklet-versions/): the chapter's own, those an
-    earlier lesson taught, and, when two coloured ones touch, the second in the
-    third colour, as "qu" always is. A single letter, a doubled one ("ss") and a
-    silent grapheme (grey instead) are not coloured."""
+    """The multi-letter graphemes of a word to colour (Kalulu-Main's
+    docs/BOOKLETS-FROM-PACKS.md, section 7): those this chapter's lesson
+    teaches, those an earlier lesson taught, and, when two coloured ones touch,
+    one of the two in the third colour so that each stays visible. That is the
+    second, unless the second is the lesson's own: the lesson's own colour
+    never changes, so the one before it does. "qu" always has the third
+    colour. A single letter, a doubled one ("ss") and a silent grapheme (grey
+    instead) are not coloured."""
     tints: list[tuple[int, int, str]] = []
     for start, end, gp_id in spans:
         gp = pack.gps[gp_id]
         grapheme = lower(gp.grapheme)
         if gp.silent or len(grapheme) < 2 or len(set(grapheme)) < 2:
             continue
-        if gp_id in chapter.gp_ids:
+        if gp_id in chapter.gp_ids or gp.lesson == chapter.lesson:
             kind = OWN
-        elif gp.lesson is not None and gp.lesson <= chapter.lesson:
+        elif gp.lesson is not None and gp.lesson < chapter.lesson:
             kind = EARLIER
         else:
             continue
-        if grapheme == "qu" or (tints and tints[-1][1] == start and tints[-1][2] != TOUCHING):
+        before = tints[-1] if tints and tints[-1][1] == start else None
+        if grapheme == "qu":
             kind = TOUCHING
+        elif before is not None and before[2] != TOUCHING:
+            if kind != OWN:
+                kind = TOUCHING
+            elif before[2] != OWN:
+                tints[-1] = (before[0], before[1], TOUCHING)
         tints.append((start, end, kind))
     return tints

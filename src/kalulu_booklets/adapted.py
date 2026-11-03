@@ -455,9 +455,11 @@ class AdaptedLayout(Layout):
         self.new_page()
         if title:
             bold = self.fonts.script_bold
-            baseline = self.place(0)
-            title_line = _Line(bold, style.story_title_size, [Styled(title)], SPACING, 0)
-            self.add(lambda canvas: self.draw_line(canvas, title_line, baseline))
+            for number, words in enumerate(_wrap(bold, Paragraph(SCRIPT, [[Styled(title)]]), style.story_title_size,
+                                                 TEXT_WIDTH, SPACING)):
+                baseline = self.place(style.story_line * mm if number else 0)
+                line = _Line(bold, style.story_title_size, words, SPACING, 0)
+                self.add(lambda canvas, line=line, baseline=baseline: self.draw_line(canvas, line, baseline))
         face = self.fonts.script
         for index, text in enumerate(paragraphs):
             lines = _wrap(face, Paragraph(SCRIPT, [[piece] for piece in text.lines()]), style.story_size, TEXT_WIDTH,
@@ -513,6 +515,10 @@ class AdaptedLayout(Layout):
     def fluency(self, content: ChapterContent, items: list[Styled]) -> None:
         """Every item, in reading order, 3 a row and 4 rows a page."""
         face, size = self.fonts.script, self.style.fluency_size
+        cell = (FLUENCY_COLUMNS[1] - FLUENCY_COLUMNS[0]) * mm
+        for item in items:
+            if self.width(face, item.text, size) > cell:
+                self.note(content, f"\"{item.text}\" is wider than its cell: check it does not run into its neighbour")
         per_page = len(FLUENCY_COLUMNS) * len(FLUENCY_ROWS)
         for start in range(0, len(items), per_page):
             self.new_page()

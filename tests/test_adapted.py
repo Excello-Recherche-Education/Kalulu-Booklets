@@ -38,11 +38,61 @@ def test_a_chapter_colours_its_own_graphemes_and_earlier_ones(pack_folder):
     pack = load(pack_folder)
     lesson_4 = next(chapter for chapter in pack.chapters if chapter.lesson == 4)
     lesson_2 = next(chapter for chapter in pack.chapters if chapter.lesson == 2)
-    # At lesson 4, "ch" is earlier and "ou" its own, but it touches "ch".
-    assert content.styled(pack, "chou", False, chapter=lesson_4).tints == ((0, 2, EARLIER), (2, 4, TOUCHING))
+    # At lesson 4, "ch" is earlier and "ou" its own: they touch, and the
+    # lesson's own keeps its colour, so "ch" changes.
+    assert content.styled(pack, "chou", False, chapter=lesson_4).tints == ((0, 2, TOUCHING), (2, 4, OWN))
     # Single letters are never coloured, nor a grapheme not taught yet.
     assert content.styled(pack, "la lune", False, chapter=lesson_4).tints == ()
     assert content.styled(pack, "chou", False, chapter=lesson_2).tints == ((0, 2, OWN),)
+
+
+def test_of_two_earlier_graphemes_that_touch_the_second_changes(pack_folder):
+    _two_letter_gps(pack_folder)
+    execute(pack_folder, "INSERT INTO Lessons (ID, LessonNb) VALUES (5, 5)")
+    execute(pack_folder, "INSERT INTO GPs (ID, Grapheme, Phoneme, Type) VALUES (9, 'an', 'an', 1)")
+    execute(pack_folder, "INSERT INTO GPsInLessons (GPID, LessonID) VALUES (9, 5)")
+    pack = load(pack_folder)
+    lesson_5 = next(chapter for chapter in pack.chapters if chapter.lesson == 5)
+    assert content.styled(pack, "chou", False, chapter=lesson_5).tints == ((0, 2, EARLIER), (2, 4, TOUCHING))
+
+
+def test_a_grapheme_of_the_chapter_lesson_is_its_own_even_when_the_chapter_does_not_list_it(pack_folder):
+    _two_letter_gps(pack_folder)
+    add_chapter(pack_folder, 4, [], Title="où")
+    pack = load(pack_folder)
+    lesson_4 = next(chapter for chapter in pack.chapters if chapter.lesson == 4)
+    assert 7 not in lesson_4.gp_ids
+    assert content.styled(pack, "chou", False, chapter=lesson_4).tints == ((0, 2, TOUCHING), (2, 4, OWN))
+
+
+def test_a_story_title_heads_its_page_and_wraps(pack_folder, monkeypatch):
+    title = "Comment le lapin Kalulu a appris à lire tout seul"
+    chapter = add_chapter(pack_folder, 2, [2], Title="L l")
+    execute(pack_folder, "INSERT INTO BookletStories (ChapterID, Position, Title, Text) VALUES (?, 0, ?, ?)",
+            chapter, title, "La lune.\n\nUne lune nue.")
+    laid_out = _layout(pack_folder, ADHD)
+    drawn = []
+    monkeypatch.setattr(laid_out, "draw_line", lambda canvas, line, baseline, *rest: drawn.append((line, baseline)))
+    canvas = Canvas(io.BytesIO())
+    for page in laid_out.run():
+        for step in page.steps:
+            step(canvas)
+    lines = [(" ".join(word.text for word in line.words), baseline) for line, baseline in drawn
+             if line.face is laid_out.fonts.script_bold]
+    assert " ".join(text for text, _ in lines) == title and len(lines) > 1
+    story = [baseline for line, baseline in drawn if line.face is laid_out.fonts.script and
+             line.words[0].text in ("La", "Une")]
+    assert min(baseline for _, baseline in lines) > max(story)
+    for line, _ in drawn:
+        if line.face is laid_out.fonts.script_bold:
+            assert sum(laid_out.width(line.face, word.text, line.size) for word in line.words) <= adapted.TEXT_WIDTH
+
+
+def test_a_fluency_item_wider_than_its_column_is_said(pack_folder):
+    laid_out = _layout(pack_folder, ADHD)
+    chapter = laid_out.booklet.chapters[0]
+    laid_out.fluency(chapter, [Styled("lalalalalalalala"), Styled("la")])
+    assert any("lalalalalalalala" in note and "wider than its cell" in note for note in laid_out.booklet.notes)
 
 
 @pytest.mark.parametrize("version", [DYSLEXIA, DYSPRAXIA, ADHD])
