@@ -78,3 +78,21 @@ def test_ink_reaches_the_accents():
         assert face.ink("À")[0] > face.ink("A")[0] > 0
     assert faces.cursive.ink("A")[0] > faces.script_bold.ink("A")[0]
     assert faces.cursive.ink("g")[1] < 0
+
+
+def test_a_converted_glyph_keeps_its_place():
+    # Kalulu's Mulish is CFF with every side bearing 0; in TrueType the bearing
+    # is where the outline is drawn from, so it must become each glyph's xMin,
+    # or "l" moves onto a capital "I" and "j" away from the letter before it.
+    from fontTools.ttLib import TTFont as FontFile
+
+    path = pinned_or_skip() / fonts.SCRIPT
+    converted = FontFile(fonts._truetype(FontFile(path)))
+    glyf, hmtx = converted["glyf"], converted["hmtx"]
+    for name in ("l", "j", "I"):
+        assert hmtx[name][1] == glyf[name].xMin
+    assert hmtx["j"][1] < 0 < hmtx["l"][1]
+
+
+def test_the_cursive_is_marelle_2():
+    assert fonts.CURSIVE == "marelle/Marelle2-Regular.ttf"

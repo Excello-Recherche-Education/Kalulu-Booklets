@@ -50,6 +50,13 @@ SEYES_FINE = HexColor("#d3cdef")
 SEYES_MARGIN = HexColor("#e2827f")
 
 GAP = 7 * mm  # between the blocks of a page
+# Between a chapter's sections, measured ink to ink on the printed booklets
+# (2026-11-09, the PO found ours too tight): about 12.8 mm from the title to the
+# syllables, from the syllables to the words and from the words to the
+# sentences. A grid row already holds some of it around its letters.
+TITLE_GAP = 10.9 * mm  # below the title's ink
+GRID_GAP = 7.9 * mm  # below a grid's last row
+BEFORE_SENTENCES = 3.6 * mm  # more, from a grid to the sentences
 
 # Sizes measured on the printed booklets (2026-10-29): the width of the same
 # text, in the same fonts, against ours. Text is never made smaller than these
@@ -87,7 +94,11 @@ FLUENCY_SIZE = 14
 FLUENCY_COLUMNS = 5
 FLUENCY_ROW = 9 * mm  # at least; rows stretch to fill the page, up to FLUENCY_ROW_MOST
 FLUENCY_ROW_MOST = 12 * mm
-FLUENCY_PADDING = 5 * mm
+FLUENCY_PADDING = 4 * mm
+# The bubble reaches further out than the text margins, so that its words have
+# room (the PO found them tight on the last rows, 2026-11-09).
+FLUENCY_LEFT = 7 * mm
+FLUENCY_WIDTH = PAGE_WIDTH - 2 * FLUENCY_LEFT
 
 # Seyès ruling: a thick line every four fine intervals. Lowercase letters are
 # one interval high, as on a French school notebook.
@@ -156,12 +167,16 @@ class Layout:
         # Sentences this booklet has printed, so a chosen one is not repeated
         # while others are left.
         self.printed_sentences: set[int] = set()
+        # Whether the last thing placed on this page is a grid: the sentences
+        # stand further from one (BEFORE_SENTENCES).
+        self.after_grid = False
 
     # --- Pages ---------------------------------------------------------------------
 
     def new_page(self, numbered: bool = True, shares_next_number: bool = False) -> Page:
         self.pages.append(Page(numbered=numbered, shares_next_number=shares_next_number))
         self.y = TOP
+        self.after_grid = False
         return self.pages[-1]
 
     @property
@@ -290,21 +305,21 @@ class Layout:
             baselines.append(baselines[-1] - step)
 
         def draw(canvas: Canvas) -> None:
-            # Each column centred in its half of the page, as printed; a line
-            # starts where the column's widest one does, so lines align.
-            script_left = (LEFT + WIDTH / 4 if with_cursive else PAGE_WIDTH / 2) \
-                - max(script.width(line, size) for line in lines) / 2
-            cursive_left = LEFT + 3 * WIDTH / 4 - max(cursive.width(line, cursive_size) for line in lines) / 2
+            # Each column centred in its half of the page, as printed, and each
+            # of its lines centred on it (the PO's rule, 2026-11-09).
+            script_centre = LEFT + WIDTH / 4 if with_cursive else PAGE_WIDTH / 2
+            cursive_centre = LEFT + 3 * WIDTH / 4
             for line, baseline in zip(lines, baselines):
-                script.draw(canvas, script_left, baseline, line, size, INK)
+                script.draw(canvas, script_centre - script.width(line, size) / 2, baseline, line, size, INK)
                 if with_cursive:
-                    cursive.draw(canvas, cursive_left, baseline, line, cursive_size, INK)
+                    cursive.draw(canvas, cursive_centre - cursive.width(line, cursive_size) / 2, baseline, line,
+                                 cursive_size, INK)
 
         self.add(draw)
         if lines:
-            self.y = baselines[-1] + bottoms[-1] - GAP
+            self.y = baselines[-1] + bottoms[-1] - TITLE_GAP
             return baselines[-1]
-        self.y -= GAP
+        self.y -= TITLE_GAP
         return None
 
     def grid(self, content: ChapterContent, items: list[Styled], columns: int, size: float, row: float) -> None:
@@ -327,22 +342,45 @@ class Layout:
                           center_y - face.x_height * size / 2, item.text, size, INK, item.grey, SILENT)
 
         self.add(draw)
-        self.y -= rows * row + GAP
+        self.y -= rows * row + GRID_GAP
+        self.after_grid = True
+
+    def below_grid(self) -> None:
+        """The room between a grid and the sentences under it."""
+        if self.after_grid:
+            self.y -= BEFORE_SENTENCES
+            self.after_grid = False
 
     def sentences(self, content: ChapterContent) -> None:
         """On the page they start on, then on at most ``sentence_pages`` more;
-        lines past that are left out and said."""
+        lines past that are left out and said. A paragraph is never cut across
+        two pages (the PO's rule, 2026-11-09: a sentence starts and ends on the
+        same page): one that does not fit where it would start goes on the next
+        page whole, unless it is taller than a page on its own."""
         limit = content.sentence_pages
         extra = 0
         dropped = 0
         self.printed_sentences.update(item.sentence_id for item in content.chapter.sentences)
+        self.below_grid()
         for index, paragraph in enumerate(content.paragraphs):
             face = self.fonts.cursive if paragraph.font == CURSIVE else self.fonts.script
             size = CURSIVE_SENTENCE_SIZE if paragraph.font == CURSIVE else SENTENCE_SIZE
             leading = size * (CURSIVE_LEADING if paragraph.font == CURSIVE else SCRIPT_LEADING)
-            if index:
-                self.y -= leading * PARAGRAPH_GAP
-            for line in _wrap(face, paragraph, size, WIDTH):
+            lines = _wrap(face, paragraph, size, WIDTH)
+            gap = leading * PARAGRAPH_GAP if index else 0
+            if dropped:
+                dropped += len(lines)
+                continue
+            whole = len(lines) * leading
+            if gap + whole > self.room() and whole <= TOP - BOTTOM:
+                if extra >= limit:
+                    dropped += len(lines)
+                    continue
+                self.new_page()
+                extra += 1
+                gap = 0
+            self.y -= gap
+            for line in lines:
                 if dropped or leading > self.room():
                     if dropped or extra >= limit:
                         dropped += 1
@@ -366,6 +404,7 @@ class Layout:
         of the pool hold one of the chapter's GPs to fill its pages, the others,
         earlier lessons' content, are printed too, and the build says so."""
         pool = sorted(content.sentence_pool, key=lambda candidate: candidate[0] in self.printed_sentences)
+        self.below_grid()
         printed: list[int] = []
         extra = 0
         placed = 0
@@ -524,7 +563,7 @@ class Layout:
         face = self.fonts.script
         below = BUBBLE_TAIL + PARAKEET_HEIGHT
         per_page = int((TOP - BOTTOM - below - 2 * FLUENCY_PADDING) // FLUENCY_ROW) * FLUENCY_COLUMNS
-        cell = (WIDTH - 2 * FLUENCY_PADDING) / FLUENCY_COLUMNS
+        cell = (FLUENCY_WIDTH - 2 * FLUENCY_PADDING) / FLUENCY_COLUMNS
         self._wider_than(content, face, [item.text for item in items], FLUENCY_SIZE, cell)
         for start in range(0, len(items), per_page):
             self.new_page()
@@ -539,15 +578,15 @@ class Layout:
             def draw(canvas: Canvas, chunk: list[Styled] = chunk, height: float = height, top: float = top,
                      row_height: float = row_height) -> None:
                 bottom = top - height
-                _bubble(canvas, LEFT, bottom, WIDTH, height, 6 * mm, PAGE_WIDTH / 2, BUBBLE_TAIL)
+                _bubble(canvas, FLUENCY_LEFT, bottom, FLUENCY_WIDTH, height, 6 * mm, PAGE_WIDTH / 2, BUBBLE_TAIL)
                 _picture(canvas, "parakeet", PAGE_WIDTH / 2, bottom - BUBBLE_TAIL - 1 * mm, PARAKEET_HEIGHT, centered=True)
                 for row in range(2):
                     _stopwatch(canvas, RIGHT - 18 * mm, bottom - BUBBLE_TAIL - 6 * mm - row * (STOPWATCH + 2 * mm), STOPWATCH)
-                cell = (WIDTH - 2 * FLUENCY_PADDING) / FLUENCY_COLUMNS
+                cell = (FLUENCY_WIDTH - 2 * FLUENCY_PADDING) / FLUENCY_COLUMNS
                 # One size for all: a test read against the clock must not
                 # have a word printed smaller than the others.
                 for index, item in enumerate(chunk):
-                    center_x = LEFT + FLUENCY_PADDING + (index % FLUENCY_COLUMNS + 0.5) * cell
+                    center_x = FLUENCY_LEFT + FLUENCY_PADDING + (index % FLUENCY_COLUMNS + 0.5) * cell
                     center_y = top - FLUENCY_PADDING - (index // FLUENCY_COLUMNS + 0.5) * row_height
                     face.draw(canvas, center_x - face.width(item.text, FLUENCY_SIZE) / 2,
                               center_y - face.x_height * FLUENCY_SIZE / 2, item.text, FLUENCY_SIZE, INK, item.grey, SILENT)
@@ -748,7 +787,7 @@ def _wrap(face: Face, paragraph: Paragraph, size: float, width: float,
                     start = None
             elif start is None:
                 start = index
-        for start, end in bounds:
+        for start, end in _unbreakable(line.text, bounds):
             word = line.slice(start, end)
             word_width = face.width(word.text, size, spacing)
             if current and used + space + word_width > width:
@@ -759,6 +798,35 @@ def _wrap(face: Face, paragraph: Paragraph, size: float, width: float,
         if current:
             printed.append(current)
     return printed
+
+
+OPENING = "«“‘([{¿¡"
+
+
+def _unbreakable(text: str, bounds: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    """``bounds`` (each word's start and end in ``text``) joined where a line
+    must not break: French sets a space before "!", "?", ":", ";" and "»", and
+    after "«", and a mark alone at the start or end of a line reads as a
+    mistake (the PO's rule, 2026-11-09). A run of punctuation with no letter or
+    digit is kept with the word before it, an opening one with the word after."""
+    def bare(start: int, end: int) -> bool:
+        return not any(character.isalnum() for character in text[start:end])
+
+    joined: list[tuple[int, int]] = []
+    pending: int | None = None  # where an opening mark waiting for its word starts
+    for start, end in bounds:
+        if pending is not None:
+            start, pending = pending, None
+        if bare(start, end) and all(character in OPENING for character in text[start:end]):
+            pending = start
+            continue
+        if joined and bare(start, end):
+            joined[-1] = (joined[-1][0], end)
+        else:
+            joined.append((start, end))
+    if pending is not None:
+        joined.append((pending, bounds[-1][1]))
+    return joined
 
 
 def _line_step(face: Face, words: list[Styled], baseline: float, size: float) -> Draw:

@@ -45,11 +45,13 @@ from reportlab.pdfgen.canvas import Canvas
 SCRIPT = "mulish/kalulu_mulish_regular.otf"
 SCRIPT_BOLD = "mulish/kalulu_mulish_bold.otf"
 SCRIPT_BLACK = "mulish/kalulu_mulish_black.otf"
-CURSIVE = "marelle/Marelle-Regular.ttf"
+# Marelle 2: shorter loops, which do not run into the lines above and below in
+# a paragraph (the PO's choice, 2026-11-09).
+CURSIVE = "marelle/Marelle2-Regular.ttf"
 
 # What each role prints with unless the pack replaces it.
 DEFAULTS = {"script": SCRIPT, "script_bold": SCRIPT_BOLD, "script_black": SCRIPT_BLACK, "cursive": CURSIVE}
-DEFAULT_NAMES = {"script": "Mulish", "script_bold": "Mulish bold", "script_black": "Mulish black", "cursive": "Marelle"}
+DEFAULT_NAMES = {"script": "Mulish", "script_bold": "Mulish bold", "script_black": "Mulish black", "cursive": "Marelle 2"}
 ROLE_NAMES = {"script": "script", "script_bold": "bold script", "script_black": "black script", "cursive": "cursive"}
 
 # Kalulu-Booklets' own checkout of the packs.
@@ -228,6 +230,15 @@ def _truetype(font: FontFile) -> io.BytesIO:
     glyf.glyphOrder = order
     glyf.glyphs = glyphs
     font["glyf"] = glyf
+    # A TrueType glyph is drawn so that its leftmost point stands at its left
+    # side bearing (hmtx), where a CFF one is drawn where its outline says.
+    # Kalulu's Mulish sets every bearing to 0, so converted as it is each glyph
+    # moved by its own xMin: "l" 79 units to the left, onto a capital "I", and
+    # "j", whose tail reaches left of its origin, 57 to the right ("tou jours").
+    metrics = font["hmtx"].metrics
+    for name in order:
+        glyphs[name].recalcBounds(glyf)
+        metrics[name] = (metrics[name][0], getattr(glyphs[name], "xMin", 0))
     font["loca"] = newTable("loca")
     del font["CFF "]
     maxp = font["maxp"]

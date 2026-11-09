@@ -165,8 +165,11 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
         image = pack.images.get(chapter.image_id)
         notes.append(f"its booklet image {f'booklet_images/{image.file}' if image else chapter.image_id} cannot be "
                      "printed: missing, not a PNG or JPEG, or not checked out (Git LFS); its teacher page is left out")
-    syllables = _picked(pack, chapter, packs.SYLLABLES, int(setting("SyllableCount")), notes)
-    words = _picked(pack, chapter, packs.WORDS, int(setting("WordCount")), notes)
+    syllable_columns, word_columns = int(setting("SyllableColumns")), int(setting("WordColumns"))
+    syllables = _picked(pack, chapter, packs.SYLLABLES,
+                        _whole_rows(int(setting("SyllableCount")), syllable_columns, "Syllable", notes), notes)
+    words = _picked(pack, chapter, packs.WORDS,
+                    _whole_rows(int(setting("WordCount")), word_columns, "Word", notes), notes)
     # -1 prints no sentence at all.
     sentence_pages = int(setting("SentencePages"))
     if sentence_pages < 0 and chapter.sentences:
@@ -179,9 +182,9 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
         chapter=chapter,
         title=[line.strip() for line in chapter.title.split("\n")] if chapter.title.strip() else [],
         syllables=_capitals(syllables, uppercase),
-        syllable_columns=int(setting("SyllableColumns")),
+        syllable_columns=syllable_columns,
         words=_capitals(words, uppercase),
-        word_columns=int(setting("WordColumns")),
+        word_columns=word_columns,
         paragraphs=_paragraphs(pack, chapter, grey, uppercase, notes) if sentence_pages >= 0 else [],
         sentence_pool=pool,
         sentence_fonts=(_paragraph_font(pack, chapter, 0), _paragraph_font(pack, chapter, 1)),
@@ -203,6 +206,18 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
 
 # --- Syllables and words ---------------------------------------------------------
 
+def _whole_rows(count: int, columns: int, kind: str, notes: list[str]) -> int:
+    """A grid fills every row it starts (the PO's rule, 2026-11-09): 7 words in
+    3 columns leave one alone on the last row, so 6 are printed. A count below
+    one row is kept: it prints as one row of its own."""
+    if columns < 1 or count <= columns or count % columns == 0:
+        return count
+    whole = count - count % columns
+    notes.append(f"{kind}Count is {count} in {columns} columns: {whole} are printed, "
+                 f"so that every row is full")
+    return whole
+
+
 def _picked(pack: Pack, chapter: Chapter, part: int, count: int, notes: list[str]) -> list[Styled]:
     """``count`` syllables or words (SCHEMA.md): the chapter's picks first, in
     their order, the last ones left out past the count. Short of it, the rest is
@@ -215,7 +230,7 @@ def _picked(pack: Pack, chapter: Chapter, part: int, count: int, notes: list[str
     listed = [styled(pack, entry.text, chapter.grey_silent, syllables_too=part == packs.SYLLABLES, chapter=tinted)
               for entry in entries]
     if len(listed) > count:
-        notes.append(f"{len(listed)} {kind}s picked and {column} is {count}: "
+        notes.append(f"{len(listed)} {kind}s picked and {count} printed: "
                      f"the last {len(listed) - count} are left out")
         return listed[:count]
     # A pick printed "la Lune" is the pack's "lune": it is not filled in twice.
