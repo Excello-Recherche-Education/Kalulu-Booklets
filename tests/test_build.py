@@ -101,3 +101,27 @@ def test_sentences_from_earlier_lessons_filling_a_chapter_are_said(pack_folder):
 def test_a_chapter_filled_with_its_own_sentences_says_nothing(pack_folder):
     add_chapter(pack_folder, 3, [3], SyllableCount=0, WordCount=0, SentencePages=0)
     assert not [note for note in _built_notes(pack_folder) if "not enough content" in note]
+
+
+def test_a_paragraph_is_never_cut_across_two_pages(pack_folder):
+    chapter = add_chapter(pack_folder, 3, [3], SyllableCount=0, WordCount=0, SentencePages=1)
+    # Two paragraphs, each sentence on its own line: the second has three.
+    for position, brk in enumerate((2, 2, 1, 1)):
+        execute(pack_folder, "INSERT INTO BookletSentences (ChapterID, SentenceID, Position, Break) VALUES (?, 2, ?, ?)",
+                chapter, position, brk)
+    booklet = content.booklet(load(pack_folder), 1)
+    chapter = own(booklet.chapters)[0]
+    pages = layout.Layout(booklet, fonts.load(fonts.PINNED))
+    pages.new_page()
+    # Room for the first paragraph and two lines of the second, whatever its font.
+    pages.y = layout.BOTTOM + 3.5 * layout.SENTENCE_SIZE * layout.CURSIVE_LEADING
+    pages.sentences(chapter)
+    assert len(pages.pages) == 2
+    assert len(pages.pages[0].steps) == 1 and len(pages.pages[1].steps) == 3
+
+
+def test_punctuation_never_starts_a_line():
+    text = "Ni vu ni connu ! « Oui » dit-il…"
+    words = [(match.start(), match.end()) for match in re.finditer(r"\S+", text)]
+    joined = [text[start:end] for start, end in layout._unbreakable(text, words)]
+    assert joined == ["Ni", "vu", "ni", "connu !", "« Oui »", "dit-il…"]

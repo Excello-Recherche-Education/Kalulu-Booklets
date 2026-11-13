@@ -224,7 +224,7 @@ checkout the pack is in (`../Kalulu-Languages/fonts` for
 | Font | File | Used for |
 |---|---|---|
 | Mulish, the version modified for Kalulu | `mulish/kalulu_mulish_{regular,bold,black}.otf` | script |
-| Marelle | `marelle/Marelle-Regular.ttf` | cursive |
+| Marelle 2 | `marelle/Marelle2-Regular.ttf` | cursive (shorter loops than Marelle) |
 
 Both are under the SIL Open Font License 1.1; see `fonts/LICENSE.md` there.
 The PDFs embed the letters they use, which the license allows.

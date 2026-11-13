@@ -23,9 +23,23 @@ def test_automatic_words_hold_a_chapter_gp_and_are_readable(pack_folder):
 
 
 def test_words_short_of_the_count_are_repeated_and_said(pack_folder):
-    booklet, chapter = chapter_content(pack_folder, WordCount=6)
+    booklet, chapter = chapter_content(pack_folder, WordCount=6, WordColumns=3)
     assert texts(chapter.words) == ["Luna", "lune", "une", "nu", "Luna", "lune"]
     assert "Lesson 3, chapter 1: WordCount is 6, and only 4 words qualify: they are repeated" in booklet.notes
+
+
+def test_a_grid_fills_every_row_it_starts(pack_folder):
+    booklet, chapter = chapter_content(pack_folder, WordCount=7, WordColumns=3, SyllableCount=8, SyllableColumns=6)
+    # 7 words in 3 columns would leave one alone on the last row.
+    assert len(chapter.words) == 6
+    assert len(chapter.syllables) == 6
+    assert "Lesson 3, chapter 1: WordCount is 7 in 3 columns: 6 are printed, so that every row is full" in booklet.notes
+
+
+def test_a_count_below_one_row_is_kept(pack_folder):
+    booklet, chapter = chapter_content(pack_folder, WordCount=2, WordColumns=4)
+    assert len(chapter.words) == 2
+    assert not [note for note in booklet.notes if "every row is full" in note]
 
 
 def test_syllables_repeat_until_the_count(pack_folder):
@@ -44,7 +58,7 @@ def test_picks_past_the_count_lose_the_last_ones(pack_folder):
     add_entries(pack_folder, chapter_id, 2, ["la Lune", "une lune"])
     booklet = content.booklet(load(pack_folder), 1)
     assert texts(own(booklet.chapters)[0].words) == ["la Lune"]
-    assert "Lesson 3, chapter 1: 2 words picked and WordCount is 1: the last 1 are left out" in booklet.notes
+    assert "Lesson 3, chapter 1: 2 words picked and 1 printed: the last 1 are left out" in booklet.notes
 
 
 def test_picks_short_of_the_count_are_filled_from_the_pack(pack_folder):
@@ -90,7 +104,7 @@ def test_a_hyphenated_word_is_its_own_or_its_parts(pack_folder):
 
 
 def test_capitals_are_spread_evenly(pack_folder):
-    _, chapter = chapter_content(pack_folder, SyllableCount=8, UppercaseProportion=0.25)
+    _, chapter = chapter_content(pack_folder, SyllableCount=8, SyllableColumns=4, UppercaseProportion=0.25)
     assert [item.text.isupper() for item in chapter.syllables] == [False, False, False, True] * 2
 
 
