@@ -34,7 +34,7 @@ def test_a_pack_without_chapters_gets_one_per_lesson(pack_folder):
     assert [(c.lesson, c.title, c.gp_ids, c.booklet, c.position) for c in pack.chapters] == [
         (1, "A a", [1], 1, 0),
         (2, "L l", [2], 1, 0),
-        (3, "U u N n", [3, 4, 5], 1, 0),  # the silent e is taught, not in the title
+        (3, "U u\nN n", [3, 4, 5], 1, 0),  # one grapheme per line; the silent e is taught, not in the title
     ]
     assert all(chapter.id < 0 and not chapter.overrides for chapter in pack.chapters)
 
@@ -49,7 +49,7 @@ def test_every_lesson_without_a_chapter_gets_its_forced_one(pack_folder):
         (2, 0, 1, "Lesson two", False),
         (2, 1, 2, "Optional", False),
         # The booklet of the last chapter before it: the optional one's.
-        (3, 0, 2, "U u N n", True),
+        (3, 0, 2, "U u\nN n", True),
     ]
 
 

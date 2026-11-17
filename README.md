@@ -177,7 +177,8 @@ stored in the pack's `Booklet*` tables: see "The reading booklets" in the packs'
 - **chapters follow the app's lessons**, and say which booklet they are in.
   Every lesson has one, its first chapter; the chapters after it are optional
   ones, printed before the next lesson's. A lesson without a chapter gets its
-  own: the lesson's graphemes, a title made of them ("L l"), the language's
+  own: the lesson's graphemes, a title made of them ("L l"; one grapheme per
+  line when there are several, so that they print as a column), the language's
   settings and the booklet of the chapter before it (booklet 1 for a pack with no
   chapter yet), as the Prof Tool makes it when it opens such a pack;
 - each chapter page has its title (script on the left, cursive on the right), its

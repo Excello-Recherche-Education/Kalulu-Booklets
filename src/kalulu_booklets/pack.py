@@ -374,7 +374,9 @@ def default_chapters(lesson_numbers: dict[int, int], lesson_gps: dict[int, list[
 def title_for(gp_ids: list[int], gps: dict[int, GP]) -> str:
     """A title from GPs, as the Prof Tool's BookletData.title_for() makes it: each
     grapheme once, exceptions and silent letters left out unless nothing else is
-    left, a single letter with its capital ("L l")."""
+    left, a single letter with its capital ("L l"), one grapheme per line, so
+    that a title of several prints as a column ("U u" above "N n"), as the
+    hand-written titles do."""
     kept = [gp_id for gp_id in gp_ids if gp_id in gps and not gps[gp_id].exception and not gps[gp_id].silent]
     parts: list[str] = []
     for gp_id in kept or gp_ids:
@@ -384,7 +386,7 @@ def title_for(gp_ids: list[int], gps: dict[int, GP]) -> str:
         text = f"{grapheme.upper()} {grapheme}" if len(grapheme) == 1 and grapheme.upper() != grapheme else grapheme
         if text not in parts:
             parts.append(text)
-    return " ".join(parts)
+    return "\n".join(parts)
 
 
 def _items(db: sqlite3.Connection, gps: dict[int, GP], table: str, column: str,
