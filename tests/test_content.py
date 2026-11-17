@@ -24,7 +24,10 @@ def test_automatic_words_hold_a_chapter_gp_and_are_readable(pack_folder):
 
 def test_words_short_of_the_count_are_repeated_and_said(pack_folder):
     booklet, chapter = chapter_content(pack_folder, WordCount=6, WordColumns=3)
-    assert texts(chapter.words) == ["Luna", "lune", "une", "nu", "Luna", "lune"]
+    # Once in order, then repeated in a shuffled round: none under itself.
+    words = texts(chapter.words)
+    assert words[:4] == ["Luna", "lune", "une", "nu"] and len(set(words[4:])) == 2
+    assert all(words[index] != words[index - 3] for index in range(3, 6))
     assert "Lesson 3, chapter 1: WordCount is 6, and only 4 words qualify: they are repeated" in booklet.notes
 
 

@@ -9,6 +9,7 @@ pages; ``layout`` places what comes out of it.
 
 from __future__ import annotations
 
+import random
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -125,10 +126,28 @@ class ChapterContent:
     # the Look & Learn image of its ImageGPID; None when it has none, or the
     # pack's images are not checked out.
     picture: Path | None = None
+    # The syllables and words chosen, each once and before capitals: what
+    # ``syllables`` and ``words`` repeat when there are too few (see arranged()).
+    syllable_choice: list[Styled] = field(default_factory=list)
+    word_choice: list[Styled] = field(default_factory=list)
 
     def is_empty(self) -> bool:
         return not (self.title or self.syllables or self.words or self.paragraphs or self.sentence_pool
                     or self.tables or self.writing or self.fluency or self.stories)
+
+    def syllables_in(self, columns: int) -> list[Styled]:
+        """The syllables for a grid of ``columns``: an adapted version prints
+        them in fewer, and a repeat must not land in the column it held above."""
+        if columns == self.syllable_columns:
+            return self.syllables
+        return _capitals(arranged(self.syllable_choice, len(self.syllables), columns,
+                                  _seed(self.chapter, packs.SYLLABLES)), self.sentence_uppercase)
+
+    def words_in(self, columns: int) -> list[Styled]:
+        if columns == self.word_columns:
+            return self.words
+        return _capitals(arranged(self.word_choice, len(self.words), columns, _seed(self.chapter, packs.WORDS)),
+                         self.sentence_uppercase)
 
 
 @dataclass
@@ -166,10 +185,12 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
         notes.append(f"its booklet image {f'booklet_images/{image.file}' if image else chapter.image_id} cannot be "
                      "printed: missing, not a PNG or JPEG, or not checked out (Git LFS); its teacher page is left out")
     syllable_columns, word_columns = int(setting("SyllableColumns")), int(setting("WordColumns"))
-    syllables = _picked(pack, chapter, packs.SYLLABLES,
-                        _whole_rows(int(setting("SyllableCount")), syllable_columns, "Syllable", notes), notes)
-    words = _picked(pack, chapter, packs.WORDS,
-                    _whole_rows(int(setting("WordCount")), word_columns, "Word", notes), notes)
+    syllable_count = _whole_rows(int(setting("SyllableCount")), syllable_columns, "Syllable", notes)
+    word_count = _whole_rows(int(setting("WordCount")), word_columns, "Word", notes)
+    syllable_choice = _picked(pack, chapter, packs.SYLLABLES, syllable_count, notes)
+    word_choice = _picked(pack, chapter, packs.WORDS, word_count, notes)
+    syllables = arranged(syllable_choice, syllable_count, syllable_columns, _seed(chapter, packs.SYLLABLES))
+    words = arranged(word_choice, word_count, word_columns, _seed(chapter, packs.WORDS))
     # -1 prints no sentence at all.
     sentence_pages = int(setting("SentencePages"))
     if sentence_pages < 0 and chapter.sentences:
@@ -201,6 +222,8 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
                  for story in chapter.stories],
         sentences_teaching=frozenset(teaching),
         picture=pack.chapter_picture(chapter),
+        syllable_choice=syllable_choice,
+        word_choice=word_choice,
     )
 
 
@@ -219,10 +242,10 @@ def _whole_rows(count: int, columns: int, kind: str, notes: list[str]) -> int:
 
 
 def _picked(pack: Pack, chapter: Chapter, part: int, count: int, notes: list[str]) -> list[Styled]:
-    """``count`` syllables or words (SCHEMA.md): the chapter's picks first, in
-    their order, the last ones left out past the count. Short of it, the rest is
-    filled from the pack (``_automatic``), and when that runs out too, what was
-    chosen is repeated until the count is reached."""
+    """Up to ``count`` syllables or words, each once (SCHEMA.md): the chapter's
+    picks first, in their order, the last ones left out past the count. Short of
+    it, the rest is filled from the pack (``_automatic``); when that runs out
+    too, arranged() repeats what was chosen until the count is reached."""
     kind, column = ("syllable", "SyllableCount") if part == packs.SYLLABLES else ("word", "WordCount")
     entries = chapter.entries.get(part, [])
     # Syllables are never coloured: only words get their graphemes' colours.
@@ -245,7 +268,89 @@ def _picked(pack: Pack, chapter: Chapter, part: int, count: int, notes: list[str
     # A syllable grid repeats its syllables by design; words only for want of more.
     if part == packs.WORDS and len(chosen) < count:
         notes.append(f"{column} is {count}, and only {len(chosen)} words qualify: they are repeated")
-    return [chosen[index % len(chosen)] for index in range(count)]
+    return chosen
+
+
+# What a repeat costs where it lands, in arranged(): beside itself on its row, or
+# under itself, is what the PO asked to avoid (2026-11-17); at the end of one row
+# and the start of the next it is barely seen; two cells away on its row ("d e
+# d") still reads as a repeat; in a column it held in an earlier row, only a
+# little.
+_BESIDE, _ABOVE, _ACROSS_ROWS, _NEAR, _SAME_COLUMN = 100, 100, 10, 5, 1
+_ATTEMPTS = 200
+_CHEAPEST = 0.7
+_ROWS_LOOKED_AT = 5
+
+
+def _seed(chapter: Chapter, part: int) -> str:
+    # A fixed seed: the same pack prints the same booklet every time.
+    return f"{chapter.id}:{part}"
+
+
+def arranged(choice: list[Styled], count: int, columns: int, seed: str) -> list[Styled]:
+    """``count`` items read row by row in ``columns``: ``choice`` once in its
+    order, then, when there are too few, again in shuffled rounds (the PO's rule,
+    2026-11-17), each using every item once so that none comes up more than
+    another. No item sits beside itself or under itself where that can be
+    helped, and as little as can be in a column it held before: of many random
+    grids, the one that costs least (``_cost``)."""
+    result = list(choice[:count])
+    if not choice or len(result) == count:
+        return result
+    # A chapter may pick the same syllable twice: a round holds each spelling once.
+    distinct = list({lower(item.text): item for item in choice}.values())
+    if len(distinct) == 1:
+        return [result[index % len(result)] for index in range(count)]
+    rng = random.Random(seed)
+    best: list[Styled] = []
+    best_cost = -1
+    # A round can corner the next one, so whole grids are compared, not rounds.
+    # Fewer attempts for a long grid, which costs more to lay.
+    for _ in range(min(_ATTEMPTS, max(20, 4800 // count))):
+        laid, cost = list(result), 0
+        while len(laid) < count:
+            cost += _one_round(distinct, min(len(distinct), count - len(laid)), laid, columns, rng)
+        if best_cost < 0 or cost < best_cost:
+            best, best_cost = laid, cost
+        if cost == 0:
+            break
+    return best
+
+
+def _one_round(items: list[Styled], size: int, laid: list[Styled], columns: int, rng: random.Random) -> int:
+    """Adds ``size`` of ``items`` to ``laid``, each among those not beside or
+    under themselves there: mostly the cheapest, sometimes any of them, since
+    taking the cheapest every time walks into the same dead end on every attempt.
+    Returns what they cost."""
+    left = list(items)
+    total = 0
+    for _ in range(size):
+        costs = [_cost(item, laid, columns) for item in left]
+        fitting = [index for index, cost in enumerate(costs) if cost < min(_BESIDE, _ABOVE)] or range(len(left))
+        if rng.random() < _CHEAPEST:
+            fitting = [index for index in fitting if costs[index] == min(costs[other] for other in fitting)]
+        index = rng.choice(fitting)
+        total += costs[index]
+        laid.append(left.pop(index))
+    return total
+
+
+def _cost(item: Styled, sequence: list[Styled], columns: int) -> int:
+    position = len(sequence)
+    column = position % columns if columns > 0 else 0
+    same = lambda other: lower(other.text) == lower(item.text)  # noqa: E731
+    cost = 0
+    if position and same(sequence[-1]):
+        cost += _BESIDE if column or columns <= 1 else _ACROSS_ROWS
+    if column >= 2 and same(sequence[-2]):
+        cost += _NEAR
+    if columns > 0 and position >= columns and same(sequence[position - columns]):
+        cost += _ABOVE
+    if columns > 0:
+        # The rows just above: further up, nobody compares.
+        earlier_rows = range(max(column, position - _ROWS_LOOKED_AT * columns), position - columns, columns)
+        cost += _SAME_COLUMN * sum(1 for earlier in earlier_rows if same(sequence[earlier]))
+    return cost
 
 
 def _automatic(pack: Pack, items: dict[int, Item], chapter: Chapter) -> list[Item]:

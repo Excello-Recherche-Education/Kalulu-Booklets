@@ -330,8 +330,8 @@ class AdaptedLayout(Layout):
             self.baseline = self.title(content.title, style.title_sizes, cursive_too=style.cursive)
         gap = style.after_title * mm
         if content.syllables:
-            self.grid(content, content.syllables, self.syllable_columns(content.syllables), style.syllable_row,
-                      gap, tinted=False)
+            columns = self.syllable_columns(content.syllables)
+            self.grid(content, content.syllables_in(columns), columns, style.syllable_row, gap, tinted=False)
             gap = style.after_syllables * mm
         if content.words:
             self.words(content, gap)
@@ -376,7 +376,7 @@ class AdaptedLayout(Layout):
             self.add(draw)
 
     def words(self, content: ChapterContent, gap: float) -> None:
-        self.grid(content, content.words, 0, self.style.word_row, gap,
+        self.grid(content, content.words_in(len(self.style.word_centres)), 0, self.style.word_row, gap,
                   centres=[PAGE_WIDTH * centre for centre in self.style.word_centres])
 
     def chapter_sentences(self, content: ChapterContent) -> None:
