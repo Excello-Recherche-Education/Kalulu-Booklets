@@ -99,18 +99,18 @@ class Style:
 STYLES = {
     "dyslexia": Style(
         size=20, cursive_size=20 * CURSIVE_SENTENCE_SIZE / SENTENCE_SIZE, cursive=True, tinted=False,
-        all_silent=False, one_sentence_a_line=False, title_sizes={1: 36, 2: 30, 3: 26},
+        all_silent=False, one_sentence_a_line=False, title_sizes={1: 36, 2: 30, 3: 26, 4: 26, 5: 26},
         first=20.8, last=194, line=9.9, cursive_line=11.6, block=25, after_title=20.4,
         syllable_row=12, after_syllables=20.8, word_row=10.9, word_centres=(2 / 7, 5 / 7),
         table_row=15.4, table_cells=19.3, story_size=18, story_title_size=20, story_line=8.8, story_paragraph=17.6),
     "dyspraxia": Style(
         size=24, cursive_size=24, cursive=False, tinted=True, all_silent=True, one_sentence_a_line=True,
-        title_sizes={1: 40, 2: 36, 3: 30}, first=22, last=186, line=17.6, cursive_line=17.6, block=42.3,
+        title_sizes={1: 40, 2: 36, 3: 30, 4: 30, 5: 30}, first=22, last=186, line=17.6, cursive_line=17.6, block=42.3,
         after_title=27.5, syllable_row=19.8, after_syllables=32.1, word_row=19.8, word_centres=(1 / 2,),
         table_row=25, table_cells=42.3, story_size=24, story_title_size=24, story_line=17.6, story_paragraph=35.3),
     "adhd": Style(
         size=24, cursive_size=24 * CURSIVE_SENTENCE_SIZE / SENTENCE_SIZE, cursive=True, tinted=True,
-        all_silent=True, one_sentence_a_line=False, title_sizes={1: 40, 2: 36, 3: 30},
+        all_silent=True, one_sentence_a_line=False, title_sizes={1: 40, 2: 36, 3: 30, 4: 30, 5: 30},
         first=22, last=186, line=17.6, cursive_line=17.6, block=42.3, after_title=27,
         syllable_row=19.75, after_syllables=32, word_row=19.75, word_centres=(1 / 2,),
         table_row=25, table_cells=42.3, story_size=24, story_title_size=24, story_line=17.6, story_paragraph=35.3,

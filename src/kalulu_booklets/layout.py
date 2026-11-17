@@ -61,7 +61,10 @@ BEFORE_SENTENCES = 3.6 * mm  # more, from a grid to the sentences
 # Sizes measured on the printed booklets (2026-10-29): the width of the same
 # text, in the same fonts, against ours. Text is never made smaller than these
 # to fit: what is too wide spills over and is said (_wider_than()).
-TITLE_SIZES = {1: 36, 2: 30, 3: 26}  # by the number of lines
+# By the number of lines. A title of four or five keeps the three-line size: every
+# title of several graphemes is a column, one per line, and a smaller one leaves
+# its cursive column too small to read.
+TITLE_SIZES = {1: 36, 2: 30, 3: 26, 4: 26, 5: 26}
 TITLE_LEADING = 1.25
 TITLE_LINE_GAP = 0.4  # the least room between two title lines' ink, in em
 CURSIVE_TITLE_SCALE = 0.52  # of the script size: the printed titles' two columns stand as tall
