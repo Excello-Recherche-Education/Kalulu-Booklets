@@ -256,10 +256,11 @@ class Layout:
             self.chosen_sentences(content)
         for index, table in enumerate(content.tables):
             self.table(content, table, with_penguin=index == 0)
-        for title, paragraphs in content.stories:
-            self.story(content, title, paragraphs)
         if self.version.writing and content.writing and content.writing_models + content.writing_tracings > 0:
             self.writing(content)
+        # The long reading texts always come after the writing pages (the PO's rule, 2026-11-17).
+        for title, paragraphs in content.stories:
+            self.story(content, title, paragraphs)
         if content.fluency:
             self.fluency(content, content.fluency)
 

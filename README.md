@@ -199,8 +199,9 @@ stored in the pack's `Booklet*` tables: see "The reading booklets" in the packs'
   booklet comes after the others;
 - silent letters are printed in grey where the chapter asks for it, found from
   each word's grapheme-phoneme decomposition;
-- then come the chapter's tables, stories, writing pages (on Seyès ruling,
-  each model in black then in grey to trace over) and fluency test;
+- then come the chapter's tables, writing pages (on Seyès ruling, each model
+  in black then in grey to trace over), stories and fluency test: a story always
+  comes after the writing pages;
 - blank pages are added before the back cover to reach a multiple of four, since
   a booklet is printed on folded sheets.
 
