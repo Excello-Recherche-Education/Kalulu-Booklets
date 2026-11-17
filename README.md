@@ -193,6 +193,10 @@ stored in the pack's `Booklet*` tables: see "The reading booklets" in the packs'
   chosen is repeated until the count is reached: once in order, then in
   shuffled rounds, so that none is printed beside itself or under itself, nor
   in the same column row after row, wherever the grid allows it;
+- a syllable, word or sentence the pack flags `Uppercase` prints in capitals,
+  while the language's `UppercaseProportion` is above 0 (the Prof Tool draws the
+  flags at that share); a chapter's pick, when every syllable or word in it is
+  flagged;
 - the sentences fit on the page they start on (`SentencePages` 0), or take up to
   that many more pages; -1 prints none. A chapter that picks no sentence gets
   as many as fit, each whole and a paragraph of its own: the sentences readable

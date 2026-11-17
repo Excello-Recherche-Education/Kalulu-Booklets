@@ -394,8 +394,6 @@ class AdaptedLayout(Layout):
             chosen = [sentence_id for sentence_id in self.chosen.get(content.chapter.id, []) if sentence_id in pool]
             for placed, sentence_id in enumerate(chosen):
                 text = pool[sentence_id]
-                if int((placed + 1) * content.sentence_uppercase) > int(placed * content.sentence_uppercase):
-                    text = text.upper()
                 blocks.append((content.sentence_fonts[placed % 2], [[piece] for piece in text.lines()]))
         if not blocks:
             return

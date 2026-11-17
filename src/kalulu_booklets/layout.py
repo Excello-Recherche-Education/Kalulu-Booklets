@@ -420,8 +420,6 @@ class Layout:
                 face = self.fonts.cursive if font == CURSIVE else self.fonts.script
                 size = CURSIVE_SENTENCE_SIZE if font == CURSIVE else SENTENCE_SIZE
                 leading = size * (CURSIVE_LEADING if font == CURSIVE else SCRIPT_LEADING)
-                if int((placed + 1) * content.sentence_uppercase) > int(placed * content.sentence_uppercase):
-                    text = text.upper()
                 lines = _wrap(face, Paragraph(font, [[piece] for piece in text.lines()]), size, WIDTH)
                 gap = leading * PARAGRAPH_GAP if placed and not top_of_page else 0
                 if gap + len(lines) * leading <= self.room():

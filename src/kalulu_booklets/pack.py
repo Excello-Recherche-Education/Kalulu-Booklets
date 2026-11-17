@@ -1,8 +1,8 @@
 """Reading a language pack's ``language.db``.
 
-The contract is Kalulu-Languages ``SCHEMA.md``, schema version 4: the lessons,
+The contract is Kalulu-Languages ``SCHEMA.md``, schema version 6: the lessons,
 the GPs they teach, the words, syllables and sentences with their
-decompositions, and the ``Booklet*`` tables that say what the booklets print and
+decompositions and the flag printing them in capitals, and the ``Booklet*`` tables that say what the booklets print and
 with which fonts.
 The pack is opened read-only; nothing here ever writes to it.
 """
@@ -16,7 +16,7 @@ from pathlib import Path
 
 from kalulu_booklets.text import lower
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 # GPs.Type: 0 silent, 1 vowel, 2 consonant.
 SILENT, VOWEL, CONSONANT = 0, 1, 2
@@ -31,9 +31,10 @@ SAME_LINE, NEW_LINE, NEW_PARAGRAPH = 0, 1, 2
 ALTERNATE, SCRIPT, CURSIVE = 0, 1, 2
 
 # The columns a chapter can override, NULL meaning the BookletSettings value.
+# UppercaseProportion is the language's alone (version 6).
 SETTINGS = (
     "SyllableCount", "SyllableColumns", "WordCount", "WordColumns",
-    "UppercaseProportion", "SentenceFont", "SentenceFirstFont", "SentencePages",
+    "SentenceFont", "SentenceFirstFont", "SentencePages",
     "WritingModels", "WritingTracings",
 )
 
@@ -109,6 +110,8 @@ class Item:
     # the game and the Prof Tool work it out. None when never (no decomposition,
     # or a GP no lesson teaches).
     lesson: int | None
+    # Printed in capitals, while the language's UppercaseProportion is above 0.
+    uppercase: bool = False
 
 
 @dataclass(frozen=True)
@@ -119,6 +122,7 @@ class Sentence:
     exception: bool = False
     reading: bool = True
     booklet_only: bool = False
+    uppercase: bool = False
 
 
 @dataclass(frozen=True)
@@ -210,6 +214,12 @@ class Pack:
     def cursive(self) -> bool:
         return self.settings["Cursive"] != 0
 
+    @property
+    def capitals(self) -> bool:
+        """Whether the Uppercase flags count: the Prof Tool draws them at the
+        language's UppercaseProportion, and at 0 they are ignored (SCHEMA.md)."""
+        return self.settings["UppercaseProportion"] > 0
+
     def setting(self, chapter: Chapter, column: str) -> float:
         """The value a chapter prints with: its own, or the language's."""
         return chapter.overrides.get(column, self.settings[column])
@@ -296,13 +306,13 @@ def _load(db: sqlite3.Connection, path: Path) -> Pack:
         linked.setdefault(row["SentenceID"], []).append(row["WordID"])
     sentences = {row["ID"]: Sentence(row["ID"], row["Sentence"], tuple(linked.get(row["ID"], ())),
                                      bool(row["Exception"]), row["Reading"] is None or row["Reading"] != 0,
-                                     bool(row["BookletOnly"]))
-                 for row in db.execute("SELECT ID, Sentence, Exception, Reading, BookletOnly FROM Sentences")}
+                                     bool(row["BookletOnly"]), bool(row["Uppercase"]))
+                 for row in db.execute("SELECT ID, Sentence, Exception, Reading, BookletOnly, Uppercase FROM Sentences")}
 
     row = db.execute("SELECT * FROM BookletSettings ORDER BY ID LIMIT 1").fetchone()
     if row is None:
         raise PackError(f"{path} has no BookletSettings row")
-    settings = {column: row[column] for column in ("Cursive",) + SETTINGS}
+    settings = {column: row[column] for column in ("Cursive", "UppercaseProportion") + SETTINGS}
     booklet_fonts = {font["ID"]: BookletFont(font["Name"], font["File"])
                      for font in db.execute("SELECT ID, Name, File FROM BookletFonts")}
     fonts = {role: booklet_fonts[row[column]] for role, column in FONT_COLUMNS.items()
@@ -395,11 +405,11 @@ def _items(db: sqlite3.Connection, gps: dict[int, GP], table: str, column: str,
     for row in db.execute(f"SELECT {key} AS ItemID, GPID FROM {relation} ORDER BY {key}, Position"):
         decompositions.setdefault(row["ItemID"], []).append(row["GPID"])
     items: dict[int, Item] = {}
-    for row in db.execute(f"SELECT ID, {column} AS Text, Exception, Reading, BookletOnly FROM {table}"):
+    for row in db.execute(f"SELECT ID, {column} AS Text, Exception, Reading, BookletOnly, Uppercase FROM {table}"):
         gp_ids = tuple(decompositions.get(row["ID"], ()))
         items[row["ID"]] = Item(row["ID"], row["Text"], bool(row["Exception"]),
                                 row["Reading"] is None or row["Reading"] != 0, bool(row["BookletOnly"]),
-                                gp_ids, _readable_at(gp_ids, gps))
+                                gp_ids, _readable_at(gp_ids, gps), bool(row["Uppercase"]))
     return items
 
 
