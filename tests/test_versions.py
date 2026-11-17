@@ -9,6 +9,7 @@ from conftest import add_chapter, execute
 from kalulu_booklets import content, fonts, layout
 from kalulu_booklets.cli import main
 from kalulu_booklets.pack import load
+from kalulu_booklets.adapted import STYLES
 from kalulu_booklets.versions import BASE, NO_WRITING, TEACHER, VERSIONS
 
 pytestmark = pytest.mark.skipif(not (fonts.PINNED / fonts.CURSIVE).is_file(),
@@ -179,3 +180,10 @@ def test_a_chapter_without_a_booklet_image_keeps_its_gp_picture(pack_folder):
     pack = load(pack_folder)
     chapter = next(chapter for chapter in pack.chapters if chapter.lesson == 2)
     assert pack.chapter_picture(chapter).name == "l-l.png"
+
+
+@pytest.mark.parametrize("sizes", [layout.TITLE_SIZES] + [style.title_sizes for style in STYLES.values()])
+def test_a_title_of_up_to_five_lines_keeps_the_three_line_size(sizes):
+    # A title of several graphemes is a column, one per line: four or five lines
+    # must not fall back to the small default size.
+    assert [sizes[lines] for lines in (4, 5)] == [sizes[3], sizes[3]]

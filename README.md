@@ -177,7 +177,8 @@ stored in the pack's `Booklet*` tables: see "The reading booklets" in the packs'
 - **chapters follow the app's lessons**, and say which booklet they are in.
   Every lesson has one, its first chapter; the chapters after it are optional
   ones, printed before the next lesson's. A lesson without a chapter gets its
-  own: the lesson's graphemes, a title made of them ("L l"), the language's
+  own: the lesson's graphemes, a title made of them ("L l"; one grapheme per
+  line when there are several, so that they print as a column), the language's
   settings and the booklet of the chapter before it (booklet 1 for a pack with no
   chapter yet), as the Prof Tool makes it when it opens such a pack;
 - each chapter page has its title (script on the left, cursive on the right), its
@@ -189,7 +190,9 @@ stored in the pack's `Booklet*` tables: see "The reading booklets" in the packs'
   words readable at its lesson that hold one of its graphemes, booklet-only ones
   first, then in the pack's order. Exceptions are left out, and so are entries
   with no vowel, such as the `l` of `l'ours`. If even that falls short, what was
-  chosen is repeated until the count is reached;
+  chosen is repeated until the count is reached: once in order, then in
+  shuffled rounds, so that none is printed beside itself or under itself, nor
+  in the same column row after row, wherever the grid allows it;
 - the sentences fit on the page they start on (`SentencePages` 0), or take up to
   that many more pages; -1 prints none. A chapter that picks no sentence gets
   as many as fit, each whole and a paragraph of its own: the sentences readable
@@ -199,8 +202,9 @@ stored in the pack's `Booklet*` tables: see "The reading booklets" in the packs'
   booklet comes after the others;
 - silent letters are printed in grey where the chapter asks for it, found from
   each word's grapheme-phoneme decomposition;
-- then come the chapter's tables, stories, writing pages (on Seyès ruling,
-  each model in black then in grey to trace over) and fluency test;
+- then come the chapter's tables, writing pages (on Seyès ruling, each model
+  in black then in grey to trace over), stories and fluency test: a story always
+  comes after the writing pages;
 - blank pages are added before the back cover to reach a multiple of four, since
   a booklet is printed on folded sheets.
 

@@ -99,18 +99,18 @@ class Style:
 STYLES = {
     "dyslexia": Style(
         size=20, cursive_size=20 * CURSIVE_SENTENCE_SIZE / SENTENCE_SIZE, cursive=True, tinted=False,
-        all_silent=False, one_sentence_a_line=False, title_sizes={1: 36, 2: 30, 3: 26},
+        all_silent=False, one_sentence_a_line=False, title_sizes={1: 36, 2: 30, 3: 26, 4: 26, 5: 26},
         first=20.8, last=194, line=9.9, cursive_line=11.6, block=25, after_title=20.4,
         syllable_row=12, after_syllables=20.8, word_row=10.9, word_centres=(2 / 7, 5 / 7),
         table_row=15.4, table_cells=19.3, story_size=18, story_title_size=20, story_line=8.8, story_paragraph=17.6),
     "dyspraxia": Style(
         size=24, cursive_size=24, cursive=False, tinted=True, all_silent=True, one_sentence_a_line=True,
-        title_sizes={1: 40, 2: 36, 3: 30}, first=22, last=186, line=17.6, cursive_line=17.6, block=42.3,
+        title_sizes={1: 40, 2: 36, 3: 30, 4: 30, 5: 30}, first=22, last=186, line=17.6, cursive_line=17.6, block=42.3,
         after_title=27.5, syllable_row=19.8, after_syllables=32.1, word_row=19.8, word_centres=(1 / 2,),
         table_row=25, table_cells=42.3, story_size=24, story_title_size=24, story_line=17.6, story_paragraph=35.3),
     "adhd": Style(
         size=24, cursive_size=24 * CURSIVE_SENTENCE_SIZE / SENTENCE_SIZE, cursive=True, tinted=True,
-        all_silent=True, one_sentence_a_line=False, title_sizes={1: 40, 2: 36, 3: 30},
+        all_silent=True, one_sentence_a_line=False, title_sizes={1: 40, 2: 36, 3: 30, 4: 30, 5: 30},
         first=22, last=186, line=17.6, cursive_line=17.6, block=42.3, after_title=27,
         syllable_row=19.75, after_syllables=32, word_row=19.75, word_centres=(1 / 2,),
         table_row=25, table_cells=42.3, story_size=24, story_title_size=24, story_line=17.6, story_paragraph=35.3,
@@ -330,18 +330,19 @@ class AdaptedLayout(Layout):
             self.baseline = self.title(content.title, style.title_sizes, cursive_too=style.cursive)
         gap = style.after_title * mm
         if content.syllables:
-            self.grid(content, content.syllables, self.syllable_columns(content.syllables), style.syllable_row,
-                      gap, tinted=False)
+            columns = self.syllable_columns(content.syllables)
+            self.grid(content, content.syllables_in(columns), columns, style.syllable_row, gap, tinted=False)
             gap = style.after_syllables * mm
         if content.words:
             self.words(content, gap)
         self.chapter_sentences(content)
         for index, table in enumerate(content.tables):
             self.table(content, table, with_penguin=index == 0)
-        for title, paragraphs in content.stories:
-            self.story(content, title, paragraphs)
         if self.version.writing and content.writing and content.writing_models + content.writing_tracings > 0:
             self.writing(content)
+        # The long reading texts always come after the writing pages (the PO's rule, 2026-11-17).
+        for title, paragraphs in content.stories:
+            self.story(content, title, paragraphs)
         if content.fluency:
             self.fluency(content, content.fluency)
 
@@ -375,7 +376,7 @@ class AdaptedLayout(Layout):
             self.add(draw)
 
     def words(self, content: ChapterContent, gap: float) -> None:
-        self.grid(content, content.words, 0, self.style.word_row, gap,
+        self.grid(content, content.words_in(len(self.style.word_centres)), 0, self.style.word_row, gap,
                   centres=[PAGE_WIDTH * centre for centre in self.style.word_centres])
 
     def chapter_sentences(self, content: ChapterContent) -> None:
