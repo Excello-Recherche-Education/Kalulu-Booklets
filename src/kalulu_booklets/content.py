@@ -2,7 +2,7 @@
 
 This is where the PO's rules are applied (Kalulu-Main
 ``docs/BOOKLETS-FROM-PACKS.md``, and ``SCHEMA.md`` "The reading booklets"):
-the automatic syllables and words, the share in capitals, the paragraphs and
+the automatic syllables and words, the entries in capitals, the paragraphs and
 their fonts, the silent letters to print in grey. Nothing here knows about
 pages; ``layout`` places what comes out of it.
 """
@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from kalulu_booklets import pack as packs
-from kalulu_booklets.pack import Chapter, Item, Pack
+from kalulu_booklets.pack import Chapter, Item, Pack, Sentence
 from kalulu_booklets.text import lower, upper, word_spans, words_of
 
 SCRIPT, CURSIVE = "script", "cursive"
@@ -105,11 +105,10 @@ class ChapterContent:
     word_columns: int
     paragraphs: list[Paragraph]
     # When the chapter picks no sentence: the ones the layout may choose from,
-    # in order, as many as fit (each a paragraph of its own). The fonts
-    # paragraphs alternate between, and the share printed in capitals.
+    # in order, as many as fit (each a paragraph of its own), those flagged
+    # Uppercase already in capitals. The fonts paragraphs alternate between.
     sentence_pool: list[tuple[int, Styled]]
     sentence_fonts: tuple[str, str]
-    sentence_uppercase: float
     # Pages the sentences may take after the one they start on; 0 for none.
     sentence_pages: int
     tables: list[list[TableRow]]
@@ -126,8 +125,8 @@ class ChapterContent:
     # the Look & Learn image of its ImageGPID; None when it has none, or the
     # pack's images are not checked out.
     picture: Path | None = None
-    # The syllables and words chosen, each once and before capitals: what
-    # ``syllables`` and ``words`` repeat when there are too few (see arranged()).
+    # The syllables and words chosen, each once: what ``syllables`` and
+    # ``words`` repeat when there are too few (see arranged()).
     syllable_choice: list[Styled] = field(default_factory=list)
     word_choice: list[Styled] = field(default_factory=list)
 
@@ -140,14 +139,12 @@ class ChapterContent:
         them in fewer, and a repeat must not land in the column it held above."""
         if columns == self.syllable_columns:
             return self.syllables
-        return _capitals(arranged(self.syllable_choice, len(self.syllables), columns,
-                                  _seed(self.chapter, packs.SYLLABLES)), self.sentence_uppercase)
+        return arranged(self.syllable_choice, len(self.syllables), columns, _seed(self.chapter, packs.SYLLABLES))
 
     def words_in(self, columns: int) -> list[Styled]:
         if columns == self.word_columns:
             return self.words
-        return _capitals(arranged(self.word_choice, len(self.words), columns, _seed(self.chapter, packs.WORDS)),
-                         self.sentence_uppercase)
+        return arranged(self.word_choice, len(self.words), columns, _seed(self.chapter, packs.WORDS))
 
 
 @dataclass
@@ -178,7 +175,6 @@ def booklet(pack: Pack, number: int) -> Booklet:
 def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
     setting = lambda column: pack.setting(chapter, column)  # noqa: E731
     grey = chapter.grey_silent
-    uppercase = float(setting("UppercaseProportion"))
 
     if chapter.image_id is not None and pack.chapter_picture(chapter) is None:
         image = pack.images.get(chapter.image_id)
@@ -202,14 +198,13 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
     return ChapterContent(
         chapter=chapter,
         title=[line.strip() for line in chapter.title.split("\n")] if chapter.title.strip() else [],
-        syllables=_capitals(syllables, uppercase),
+        syllables=syllables,
         syllable_columns=syllable_columns,
-        words=_capitals(words, uppercase),
+        words=words,
         word_columns=word_columns,
-        paragraphs=_paragraphs(pack, chapter, grey, uppercase, notes) if sentence_pages >= 0 else [],
+        paragraphs=_paragraphs(pack, chapter, grey, notes) if sentence_pages >= 0 else [],
         sentence_pool=pool,
         sentence_fonts=(_paragraph_font(pack, chapter, 0), _paragraph_font(pack, chapter, 1)),
-        sentence_uppercase=uppercase,
         sentence_pages=max(sentence_pages, 0),
         tables=_tables(pack, chapter, grey),
         writing=[entry.text for entry in chapter.entries.get(packs.WRITING, [])],
@@ -250,7 +245,8 @@ def _picked(pack: Pack, chapter: Chapter, part: int, count: int, notes: list[str
     entries = chapter.entries.get(part, [])
     # Syllables are never coloured: only words get their graphemes' colours.
     tinted = chapter if part == packs.WORDS else None
-    listed = [styled(pack, entry.text, chapter.grey_silent, syllables_too=part == packs.SYLLABLES, chapter=tinted)
+    listed = [_in_capitals(styled(pack, entry.text, chapter.grey_silent, syllables_too=part == packs.SYLLABLES,
+                                  chapter=tinted), _pick_flagged(pack, entry.text, part))
               for entry in entries]
     if len(listed) > count:
         notes.append(f"{len(listed)} {kind}s picked and {count} printed: "
@@ -259,7 +255,7 @@ def _picked(pack: Pack, chapter: Chapter, part: int, count: int, notes: list[str
     # A pick printed "la Lune" is the pack's "lune": it is not filled in twice.
     picked = {word for entry in entries for word in words_of(entry.text, pack.words_by_text)}
     items = pack.syllables if part == packs.SYLLABLES else pack.words
-    filling = [_styled_item(pack, item, chapter.grey_silent, tinted)
+    filling = [_in_capitals(_styled_item(pack, item, chapter.grey_silent, tinted), pack.capitals and item.uppercase)
                for item in _automatic(pack, items, chapter) if lower(item.text) not in picked]
     chosen = listed + filling[:count - len(listed)]
     if count and not chosen:
@@ -376,33 +372,46 @@ def _automatic(pack: Pack, items: dict[int, Item], chapter: Chapter) -> list[Ite
     return chosen
 
 
-def _capitals(items: list[Styled], proportion: float) -> list[Styled]:
-    """Prints a share of the items in capitals, spread evenly: at 0.25, every
-    fourth."""
-    return [item.upper() if int((index + 1) * proportion) > int(index * proportion) else item
-            for index, item in enumerate(items)]
+def _in_capitals(item: Styled, flagged: bool) -> Styled:
+    return item.upper() if flagged else item
+
+
+def _pick_flagged(pack: Pack, text: str, part: int) -> bool:
+    """Whether a chapter's pick prints in capitals (SCHEMA.md, ``Uppercase``):
+    when every syllable or word of the pack it is made of is flagged, "la Lune"
+    only if both "la" and "lune" are. A word of no list leaves it as written."""
+    if not pack.capitals:
+        return False
+    lists = ((pack.syllables_by_text, pack.syllables), (pack.words_by_text, pack.words))
+    if part == packs.WORDS:
+        lists = lists[::-1]
+    spellings = words_of(text, pack.words_by_text)
+    return bool(spellings) and all(
+        any(items[item_id].uppercase for by_text, items in lists for item_id in by_text.get(spelling, []))
+        for spelling in spellings)
+
+
+def _sentence_text(pack: Pack, sentence: Sentence, grey: bool, chapter: Chapter) -> Styled:
+    return _in_capitals(styled(pack, sentence.text, grey, linked=sentence.word_ids, chapter=chapter),
+                        pack.capitals and sentence.uppercase)
 
 
 # --- Sentences ---------------------------------------------------------------------
 
-def _paragraphs(pack: Pack, chapter: Chapter, grey: bool, uppercase: float,
-                notes: list[str]) -> list[Paragraph]:
+def _paragraphs(pack: Pack, chapter: Chapter, grey: bool, notes: list[str]) -> list[Paragraph]:
     paragraphs: list[Paragraph] = []
     found = [(item, pack.sentences.get(item.sentence_id)) for item in chapter.sentences]
     for item, sentence in found:
         if sentence is None:
             notes.append(f"sentence {item.sentence_id} is not in the Sentence List")
     found = [(item, sentence) for item, sentence in found if sentence is not None]
-    for index, (item, sentence) in enumerate(found):
+    for item, sentence in found:
         lesson = _sentence_lesson(pack, sentence)
         if lesson is None:
             notes.append(f"sentence \"{sentence.text}\" is never readable")
         elif lesson > chapter.lesson:
             notes.append(f"sentence \"{sentence.text}\" is readable from lesson {lesson}")
-        text = styled(pack, sentence.text, grey, linked=sentence.word_ids, chapter=chapter)
-        if int((index + 1) * uppercase) > int(index * uppercase):
-            text = text.upper()
-        pieces = text.lines()
+        pieces = _sentence_text(pack, sentence, grey, chapter).lines()
         if not paragraphs or item.brk == packs.NEW_PARAGRAPH:
             paragraphs.append(Paragraph(_paragraph_font(pack, chapter, len(paragraphs)), [[]]))
         elif item.brk == packs.NEW_LINE:
@@ -429,8 +438,7 @@ def _sentence_pool(pack: Pack, chapter: Chapter, grey: bool) -> tuple[list[tuple
         ranked.append(((not teaches, not sentence.booklet_only, sentence.id), sentence))
     ranked.sort(key=lambda pair: pair[0])
     teaching = {sentence.id for key, sentence in ranked if not key[0]}
-    return [(sentence.id, styled(pack, sentence.text, grey, linked=sentence.word_ids, chapter=chapter))
-            for _, sentence in ranked], teaching
+    return [(sentence.id, _sentence_text(pack, sentence, grey, chapter)) for _, sentence in ranked], teaching
 
 
 def _paragraph_font(pack: Pack, chapter: Chapter, index: int) -> str:

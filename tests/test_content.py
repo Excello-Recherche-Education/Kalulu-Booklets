@@ -106,9 +106,43 @@ def test_a_hyphenated_word_is_its_own_or_its_parts(pack_folder):
     assert content.styled(pack, "une-lune", grey=True).grey == {2, 7}
 
 
-def test_capitals_are_spread_evenly(pack_folder):
-    _, chapter = chapter_content(pack_folder, SyllableCount=8, SyllableColumns=4, UppercaseProportion=0.25)
-    assert [item.text.isupper() for item in chapter.syllables] == [False, False, False, True] * 2
+def _capitals(pack_folder, share, words=(), syllables=(), sentences=()):
+    execute(pack_folder, "UPDATE BookletSettings SET UppercaseProportion = ?", share)
+    for table, ids in (("Words", words), ("Syllables", syllables), ("Sentences", sentences)):
+        for item_id in ids:
+            execute(pack_folder, f"UPDATE {table} SET Uppercase = 1 WHERE ID = ?", item_id)
+
+
+def test_flagged_entries_print_in_capitals(pack_folder):
+    # "lune" (word 2), "nu" (syllable 2) and "Une lune nue." (sentence 2).
+    _capitals(pack_folder, 1 / 3, words=[2], syllables=[2], sentences=[2])
+    _, chapter = chapter_content(pack_folder, WordCount=4, SyllableCount=3, SentencePages=0)
+    assert texts(chapter.words) == ["Luna", "LUNE", "une", "nu"]
+    assert texts(chapter.syllables) == ["NU", "lu", "un"]
+    assert dict(chapter.sentence_pool)[2].text == "UNE LUNE NUE." and dict(chapter.sentence_pool)[1].text == "La lune."
+
+
+def test_flags_are_ignored_while_the_share_is_zero(pack_folder):
+    _capitals(pack_folder, 0, words=[2], syllables=[2], sentences=[2])
+    _, chapter = chapter_content(pack_folder, WordCount=4, SyllableCount=3)
+    assert not any(item.text.isupper() for item in chapter.words + chapter.syllables)
+
+
+def test_a_pick_prints_in_capitals_when_all_its_words_are_flagged(pack_folder):
+    _capitals(pack_folder, 0.5, words=[1, 2, 4])
+    chapter_id = add_chapter(pack_folder, 3, [3], WordCount=3)
+    add_entries(pack_folder, chapter_id, 2, ["la Lune", "une lune", "lune nue"])
+    words = texts(own(content.booklet(load(pack_folder), 1).chapters)[0].words)
+    assert words == ["LA LUNE", "UNE LUNE", "lune nue"]  # "nu" is not flagged
+
+
+def test_a_chapters_sentences_print_in_capitals_by_their_flag(pack_folder):
+    _capitals(pack_folder, 1 / 3, sentences=[1])
+    chapter_id = add_chapter(pack_folder, 3, [3])
+    add_sentences(pack_folder, chapter_id, [2, 0])
+    chapter = own(content.booklet(load(pack_folder), 1).chapters)[0]
+    assert [[texts(line) for line in paragraph.lines] for paragraph in chapter.paragraphs] == [
+        [["LA LUNE.", "Une lune nue."]]]
 
 
 def add_sentences(pack_folder, chapter_id, breaks):
