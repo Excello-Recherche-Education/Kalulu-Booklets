@@ -128,7 +128,9 @@ only ever read.
 Every booklet is written in each of its **versions**, one folder per version under
 `build/<locale>/`. Every version has the same content; only the pages differ (an
 adapted version prints the sentences the base booklet chose for a chapter that
-picks none):
+picks none). **A language prints the versions its pack asks for** — the base
+booklet always, the others as its `BookletSettings` says (`pt_BR`: the base booklet
+only) — and `--version` picks among those:
 
 | Version | Folder, file | What changes |
 |---|---|---|
@@ -138,6 +140,14 @@ picks none):
 | dyslexia | `dyslexia/<locale>-booklet-<n>-dyslexia.pdf` | bigger, airier text: script at 20 pt with letter and word spacing, more space between lines; words in two columns; a chapter over several pages, its sentences on pages of their own; the fluency test in 3 columns, every item, over as many pages as it takes; a writing ruling with wider lines; page numbers bottom right. "Version différenciée" on the cover, and an adaptations page before the back cover saying what changed |
 | dyspraxia | `dyspraxia/<locale>-booklet-<n>-dyspraxia.pdf` | as dyslexia, at 24 pt, words one per line, in script only but for its writing pages, which keep their cursive models; the multi-letter graphemes coloured (the chapter's own orange, earlier ones indigo, dark red where two touch and for "qu") and every silent letter grey |
 | adhd | `adhd/<locale>-booklet-<n>-adhd.pdf` | as dyspraxia, with the cursive kept, and no animal drawn: no penguin above the tables, no caterpillar on the writing pages |
+
+**A language prints a script series, a cursive series, or both** (its
+`BookletSettings`). The script series prints everything in script, with the
+syllables, words and sentences the pack flags in capitals; the cursive series
+prints titles, sentences and writing pages in cursive too, and no capitals. A
+language printing both, as `pt_BR` does like its printed booklets, writes each
+booklet twice in each version's folder: `<locale>-booklet-<n>-script.pdf` and
+`<locale>-booklet-<n>-cursive.pdf`. A language of one series keeps the names above.
 
 The base and no-writing versions are also written **for printing**, as
 `…-print.pdf`: A4 landscape, two A5 pages a side, in saddle-stitch order (the last

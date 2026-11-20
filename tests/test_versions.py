@@ -187,3 +187,35 @@ def test_a_title_of_up_to_five_lines_keeps_the_three_line_size(sizes):
     # A title of several graphemes is a column, one per line: four or five lines
     # must not fall back to the small default size.
     assert [sizes[lines] for lines in (4, 5)] == [sizes[3], sizes[3]]
+
+
+def test_a_language_prints_its_series_and_versions_only(pack_folder, tmp_path, capsys):
+    add_chapter(pack_folder, 2, [2], Title="L l")
+    execute(pack_folder, "UPDATE BookletSettings SET ScriptSeries = 1, CursiveSeries = 1, TeacherVersion = 0, "
+                         "NoWritingVersion = 0, DyslexiaVersion = 0, DyspraxiaVersion = 0, AdhdVersion = 0")
+    assert load(pack_folder).versions == ("base",)
+    out = tmp_path / "out"
+    assert main(["build", str(pack_folder), "--version", "base", "--version", "adhd", "--out", str(out)]) == 0
+    assert "xx_XX prints no adhd version" in capsys.readouterr().out
+    assert [folder.name for folder in (out / "xx_XX").iterdir()] == ["base"]
+    assert sorted(path.name for path in (out / "xx_XX" / "base").iterdir()) == [
+        "xx_XX-booklet-1-cursive-print.pdf", "xx_XX-booklet-1-cursive.pdf",
+        "xx_XX-booklet-1-script-print.pdf", "xx_XX-booklet-1-script.pdf"]
+
+
+def test_a_language_of_one_series_keeps_its_file_names(pack_folder, tmp_path):
+    out = tmp_path / "out"
+    assert main(["build", str(pack_folder), "--version", "base", "--out", str(out)]) == 0
+    assert (out / "xx_XX" / "base" / "xx_XX-booklet-1.pdf").is_file()
+
+
+def test_a_short_fluency_test_keeps_a_full_bubble(pack_folder):
+    # The printed Brazilian booklet's 25-item test has the 50-item one's bubble.
+    heights = []
+    for count in (25, 50):
+        pages = layout.Layout(content.booklet(load(pack_folder), 1), fonts.load(fonts.PINNED))
+        pages.new_page()
+        top = pages.y
+        pages.fluency(None, [content.Styled("la")] * count)
+        heights.append(top - pages.y)
+    assert heights[0] == pytest.approx(heights[1])

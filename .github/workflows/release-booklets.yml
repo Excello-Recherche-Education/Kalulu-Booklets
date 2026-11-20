@@ -119,7 +119,7 @@ jobs:
           {
             echo "The Kalulu reading booklets of every language pack, as PDF, A5 (148 × 210 mm): one zip per language."
             echo
-            echo "Each zip holds a folder per version: \`base\`, \`teacher\` (a page with the chapter's picture before each chapter, under the same page number) \`no-writing\` (without the writing pages), and the three adapted ones, \`dyslexia\`, \`dyspraxia\` and \`adhd\` (bigger and airier text, a chapter over several pages; dyspraxia and adhd colour the multi-letter graphemes). The \`-print\` files are the same booklets on A4 sheets, two pages a side, in the order a folded and stapled booklet reads them."
+            echo "Each zip holds a folder per version: \`base\`, \`teacher\` (a page with the chapter's picture before each chapter, under the same page number) \`no-writing\` (without the writing pages), and the three adapted ones, \`dyslexia\`, \`dyspraxia\` and \`adhd\` (bigger and airier text, a chapter over several pages; dyspraxia and adhd colour the multi-letter graphemes). A language printing a script and a cursive series (\`pt_BR\`) has both in each folder, as \`-script\` and \`-cursive\` files, and a language prints only the versions its pack asks for. The \`-print\` files are the same booklets on A4 sheets, two pages a side, in the order a folded and stapled booklet reads them."
             echo
             echo "| Language | Download | Booklets | Pages |"
             echo "|---|---|---|---|"

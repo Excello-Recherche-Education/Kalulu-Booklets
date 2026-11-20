@@ -1,6 +1,6 @@
 """Reading a language pack's ``language.db``.
 
-The contract is Kalulu-Languages ``SCHEMA.md``, schema version 6: the lessons,
+The contract is Kalulu-Languages ``SCHEMA.md``, schema version 7: the lessons,
 the GPs they teach, the words, syllables and sentences with their
 decompositions and the flag printing them in capitals, and the ``Booklet*`` tables that say what the booklets print and
 with which fonts.
@@ -16,7 +16,7 @@ from pathlib import Path
 
 from kalulu_booklets.text import lower
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 # GPs.Type: 0 silent, 1 vowel, 2 consonant.
 SILENT, VOWEL, CONSONANT = 0, 1, 2
@@ -29,6 +29,12 @@ SAME_LINE, NEW_LINE, NEW_PARAGRAPH = 0, 1, 2
 
 # BookletSettings.SentenceFont and SentenceFirstFont.
 ALTERNATE, SCRIPT, CURSIVE = 0, 1, 2
+
+# What a language prints (version 7): its series, and the versions printed
+# besides the base booklet, by versions.py's names.
+SERIES_COLUMNS = {"script": "ScriptSeries", "cursive": "CursiveSeries"}
+VERSION_COLUMNS = {"teacher": "TeacherVersion", "no-writing": "NoWritingVersion", "dyslexia": "DyslexiaVersion",
+                   "dyspraxia": "DyspraxiaVersion", "adhd": "AdhdVersion"}
 
 # The columns a chapter can override, NULL meaning the BookletSettings value.
 # UppercaseProportion is the language's alone (version 6).
@@ -211,8 +217,16 @@ class Pack:
     made_chapters_for: list[int] = field(default_factory=list)
 
     @property
-    def cursive(self) -> bool:
-        return self.settings["Cursive"] != 0
+    def series(self) -> tuple[str, ...]:
+        """The series the language prints, "script" and / or "cursive", in
+        that order (SCHEMA.md, ``ScriptSeries`` / ``CursiveSeries``)."""
+        return tuple(name for name, column in SERIES_COLUMNS.items() if self.settings[column])
+
+    @property
+    def versions(self) -> tuple[str, ...]:
+        """The versions the language prints: the base booklet always, then
+        those its settings ask for."""
+        return ("base",) + tuple(name for name, column in VERSION_COLUMNS.items() if self.settings[column])
 
     @property
     def capitals(self) -> bool:
@@ -312,7 +326,8 @@ def _load(db: sqlite3.Connection, path: Path) -> Pack:
     row = db.execute("SELECT * FROM BookletSettings ORDER BY ID LIMIT 1").fetchone()
     if row is None:
         raise PackError(f"{path} has no BookletSettings row")
-    settings = {column: row[column] for column in ("Cursive", "UppercaseProportion") + SETTINGS}
+    settings = {column: row[column] for column in ("UppercaseProportion",) + tuple(SERIES_COLUMNS.values())
+                + tuple(VERSION_COLUMNS.values()) + SETTINGS}
     booklet_fonts = {font["ID"]: BookletFont(font["Name"], font["File"])
                      for font in db.execute("SELECT ID, Name, File FROM BookletFonts")}
     fonts = {role: booklet_fonts[row[column]] for role, column in FONT_COLUMNS.items()

@@ -97,6 +97,9 @@ FLUENCY_SIZE = 14
 FLUENCY_COLUMNS = 5
 FLUENCY_ROW = 9 * mm  # at least; rows stretch to fill the page, up to FLUENCY_ROW_MOST
 FLUENCY_ROW_MOST = 12 * mm
+# A shorter test keeps a full test's bubble and row spacing, its rows at the
+# top, as the printed Brazilian booklet's 25-item test does.
+FLUENCY_FULL_ROWS = 10
 FLUENCY_PADDING = 4 * mm
 # The bubble reaches further out than the text margins, so that its words have
 # room (the PO found them tight on the last rows, 2026-11-09).
@@ -570,7 +573,7 @@ class Layout:
         for start in range(0, len(items), per_page):
             self.new_page()
             chunk = items[start:start + per_page]
-            rows = math.ceil(len(chunk) / FLUENCY_COLUMNS)
+            rows = max(math.ceil(len(chunk) / FLUENCY_COLUMNS), FLUENCY_FULL_ROWS)
             # The bubble takes the page down to the parakeet, as the printed
             # booklets have it, its rows no further apart than FLUENCY_ROW_MOST.
             row_height = min(FLUENCY_ROW_MOST, (self.room() - below - 2 * FLUENCY_PADDING) / rows)
