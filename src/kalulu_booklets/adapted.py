@@ -324,7 +324,8 @@ class AdaptedLayout(Layout):
 
     def chapter(self, content: ChapterContent) -> None:
         style = self.style
-        self.new_page()
+        if content.has_chapter_page():
+            self.new_page()
         if content.title:
             self.y = _top(17)
             self.baseline = self.title(content.title, style.title_sizes, cursive_too=style.cursive)

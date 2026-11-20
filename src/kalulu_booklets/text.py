@@ -12,7 +12,7 @@ from collections.abc import Container
 
 # BookletData.SEPARATORS in Kalulu-ProfTool: the Sentence List's parser, plus
 # the typography of a story. An apostrophe cuts too, so "l'ours" is "l" + "ours".
-SEPARATORS = "'’!()[]{};:\"\\,<>./?@#$%^&*_~«»…–—|"
+SEPARATORS = "'’!()[]{};:\"\\,<>./?@#$%^&*_~«»…–—|¡¿"
 
 # The Prof Tool also cuts at these, and nowhere else: a no-break space does not.
 _BLANKS = " \n\t"

@@ -249,7 +249,8 @@ class Layout:
     def chapter(self, content: ChapterContent) -> None:
         if self.version.teacher and content.picture is not None:
             self.teacher_page(content)
-        self.new_page()
+        if content.has_chapter_page():
+            self.new_page()
         if content.title:
             self.title(content.title)
         if content.syllables:

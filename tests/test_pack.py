@@ -90,3 +90,8 @@ def test_the_pack_is_opened_read_only(pack_folder):
     before = (pack_folder / "language.db").read_bytes()
     load(pack_folder)
     assert (pack_folder / "language.db").read_bytes() == before
+
+
+def test_inverted_marks_cut_words():
+    from kalulu_booklets.text import words_of
+    assert words_of("¡Ese oso amasa! ¿Quién canta?") == ["ese", "oso", "amasa", "quién", "canta"]

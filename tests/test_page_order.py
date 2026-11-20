@@ -31,3 +31,16 @@ def test_a_story_comes_after_the_writing_pages(pack_folder, monkeypatch, version
                                                                                   _original(self, *args))[1])
     layout.layout_for(content.booklet(load(pack_folder), 1), fonts.load(fonts.PINNED), version).run()
     assert calls == ["writing", "story", "fluency"]
+
+
+def test_a_chapter_of_stories_only_starts_on_its_first_story(pack_folder):
+    from conftest import add_chapter, execute
+    chapter = add_chapter(pack_folder, 2, [2], Title="", SyllableCount=0, WordCount=0, SentencePages=-1)
+    execute(pack_folder, "INSERT INTO BookletStories (ChapterID, Position, Title, Text) VALUES (?, 0, 'Luna', 'La lune.')",
+            chapter)
+    booklet = content.booklet(load(pack_folder), 1)
+    story_chapter = next(c for c in booklet.chapters if c.chapter.id == chapter)
+    assert not story_chapter.has_chapter_page()
+    pages = layout.Layout(booklet, fonts.load(fonts.PINNED)).run()
+    # No page is left blank between the chapters around it and the story.
+    assert all(page.steps for page in pages[1:-1] if page.numbered)

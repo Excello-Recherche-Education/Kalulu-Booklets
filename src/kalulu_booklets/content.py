@@ -130,6 +130,12 @@ class ChapterContent:
     syllable_choice: list[Styled] = field(default_factory=list)
     word_choice: list[Styled] = field(default_factory=list)
 
+    def has_chapter_page(self) -> bool:
+        """Whether it prints a chapter page: a chapter holding only stories, as
+        the Argentine booklet 3 does, starts on its first story."""
+        return bool(self.title or self.syllables or self.words or self.paragraphs or self.sentence_pool
+                    or self.tables)
+
     def is_empty(self) -> bool:
         return not (self.title or self.syllables or self.words or self.paragraphs or self.sentence_pool
                     or self.tables or self.writing or self.fluency or self.stories)
