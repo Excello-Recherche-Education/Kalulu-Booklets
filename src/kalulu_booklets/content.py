@@ -157,13 +157,21 @@ class Booklet:
     notes: list[str] = field(default_factory=list)
 
 
-def booklet(pack: Pack, number: int) -> Booklet:
-    result = Booklet(pack.locale, number, pack.cursive, [])
+def booklet(pack: Pack, number: int, series: str | None = None) -> Booklet:
+    """Booklet ``number`` of the ``series`` given, "script" or "cursive" (by
+    default the first the language prints, SCHEMA.md ``ScriptSeries`` /
+    ``CursiveSeries``). The cursive series also prints its titles, sentences and
+    writing pages in cursive; capitals are printed in the script series only, as
+    the printed Brazilian booklets have them."""
+    series = series or pack.series[0]
+    cursive = series == CURSIVE
+    capitals = pack.capitals and not cursive
+    result = Booklet(pack.locale, number, cursive, [])
     for chapter in pack.chapters:
         if chapter.booklet != number:
             continue
         notes: list[str] = []
-        content = _chapter(pack, chapter, notes)
+        content = _chapter(pack, chapter, notes, cursive, capitals)
         result.notes.extend(f"{chapter.name}: {note}" for note in notes)
         if content.is_empty():
             result.notes.append(f"{chapter.name}: prints nothing, so it has no page")
@@ -172,7 +180,7 @@ def booklet(pack: Pack, number: int) -> Booklet:
     return result
 
 
-def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
+def _chapter(pack: Pack, chapter: Chapter, notes: list[str], cursive: bool, capitals: bool) -> ChapterContent:
     setting = lambda column: pack.setting(chapter, column)  # noqa: E731
     grey = chapter.grey_silent
 
@@ -183,15 +191,15 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
     syllable_columns, word_columns = int(setting("SyllableColumns")), int(setting("WordColumns"))
     syllable_count = _whole_rows(int(setting("SyllableCount")), syllable_columns, "Syllable", notes)
     word_count = _whole_rows(int(setting("WordCount")), word_columns, "Word", notes)
-    syllable_choice = _picked(pack, chapter, packs.SYLLABLES, syllable_count, notes)
-    word_choice = _picked(pack, chapter, packs.WORDS, word_count, notes)
+    syllable_choice = _picked(pack, chapter, packs.SYLLABLES, syllable_count, notes, capitals)
+    word_choice = _picked(pack, chapter, packs.WORDS, word_count, notes, capitals)
     syllables = arranged(syllable_choice, syllable_count, syllable_columns, _seed(chapter, packs.SYLLABLES))
     words = arranged(word_choice, word_count, word_columns, _seed(chapter, packs.WORDS))
     # -1 prints no sentence at all.
     sentence_pages = int(setting("SentencePages"))
     if sentence_pages < 0 and chapter.sentences:
         notes.append(f"SentencePages is -1, so its {len(chapter.sentences)} sentence(s) are not printed")
-    pool, teaching = _sentence_pool(pack, chapter, grey) if sentence_pages >= 0 and not chapter.sentences else ([], set())
+    pool, teaching = _sentence_pool(pack, chapter, grey, capitals) if sentence_pages >= 0 and not chapter.sentences else ([], set())
     if sentence_pages >= 0 and not chapter.sentences and not pool:
         notes.append("no sentence is readable at this lesson")
 
@@ -202,13 +210,13 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str]) -> ChapterContent:
         syllable_columns=syllable_columns,
         words=words,
         word_columns=word_columns,
-        paragraphs=_paragraphs(pack, chapter, grey, notes) if sentence_pages >= 0 else [],
+        paragraphs=_paragraphs(pack, chapter, grey, notes, cursive, capitals) if sentence_pages >= 0 else [],
         sentence_pool=pool,
-        sentence_fonts=(_paragraph_font(pack, chapter, 0), _paragraph_font(pack, chapter, 1)),
+        sentence_fonts=(_paragraph_font(pack, chapter, 0, cursive), _paragraph_font(pack, chapter, 1, cursive)),
         sentence_pages=max(sentence_pages, 0),
         tables=_tables(pack, chapter, grey),
         writing=[entry.text for entry in chapter.entries.get(packs.WRITING, [])],
-        writing_font=CURSIVE if pack.cursive else SCRIPT,
+        writing_font=CURSIVE if cursive else SCRIPT,
         writing_models=int(setting("WritingModels")),
         writing_tracings=int(setting("WritingTracings")),
         fluency=[styled(pack, entry.text, grey, chapter=chapter) for entry in chapter.entries.get(packs.FLUENCY, [])],
@@ -236,7 +244,7 @@ def _whole_rows(count: int, columns: int, kind: str, notes: list[str]) -> int:
     return whole
 
 
-def _picked(pack: Pack, chapter: Chapter, part: int, count: int, notes: list[str]) -> list[Styled]:
+def _picked(pack: Pack, chapter: Chapter, part: int, count: int, notes: list[str], capitals: bool) -> list[Styled]:
     """Up to ``count`` syllables or words, each once (SCHEMA.md): the chapter's
     picks first, in their order, the last ones left out past the count. Short of
     it, the rest is filled from the pack (``_automatic``); when that runs out
@@ -246,7 +254,7 @@ def _picked(pack: Pack, chapter: Chapter, part: int, count: int, notes: list[str
     # Syllables are never coloured: only words get their graphemes' colours.
     tinted = chapter if part == packs.WORDS else None
     listed = [_in_capitals(styled(pack, entry.text, chapter.grey_silent, syllables_too=part == packs.SYLLABLES,
-                                  chapter=tinted), _pick_flagged(pack, entry.text, part))
+                                  chapter=tinted), capitals and _pick_flagged(pack, entry.text, part))
               for entry in entries]
     if len(listed) > count:
         notes.append(f"{len(listed)} {kind}s picked and {count} printed: "
@@ -255,7 +263,7 @@ def _picked(pack: Pack, chapter: Chapter, part: int, count: int, notes: list[str
     # A pick printed "la Lune" is the pack's "lune": it is not filled in twice.
     picked = {word for entry in entries for word in words_of(entry.text, pack.words_by_text)}
     items = pack.syllables if part == packs.SYLLABLES else pack.words
-    filling = [_in_capitals(_styled_item(pack, item, chapter.grey_silent, tinted), pack.capitals and item.uppercase)
+    filling = [_in_capitals(_styled_item(pack, item, chapter.grey_silent, tinted), capitals and item.uppercase)
                for item in _automatic(pack, items, chapter) if lower(item.text) not in picked]
     chosen = listed + filling[:count - len(listed)]
     if count and not chosen:
@@ -391,14 +399,15 @@ def _pick_flagged(pack: Pack, text: str, part: int) -> bool:
         for spelling in spellings)
 
 
-def _sentence_text(pack: Pack, sentence: Sentence, grey: bool, chapter: Chapter) -> Styled:
+def _sentence_text(pack: Pack, sentence: Sentence, grey: bool, chapter: Chapter, capitals: bool) -> Styled:
     return _in_capitals(styled(pack, sentence.text, grey, linked=sentence.word_ids, chapter=chapter),
-                        pack.capitals and sentence.uppercase)
+                        capitals and sentence.uppercase)
 
 
 # --- Sentences ---------------------------------------------------------------------
 
-def _paragraphs(pack: Pack, chapter: Chapter, grey: bool, notes: list[str]) -> list[Paragraph]:
+def _paragraphs(pack: Pack, chapter: Chapter, grey: bool, notes: list[str], cursive: bool,
+                capitals: bool) -> list[Paragraph]:
     paragraphs: list[Paragraph] = []
     found = [(item, pack.sentences.get(item.sentence_id)) for item in chapter.sentences]
     for item, sentence in found:
@@ -411,9 +420,9 @@ def _paragraphs(pack: Pack, chapter: Chapter, grey: bool, notes: list[str]) -> l
             notes.append(f"sentence \"{sentence.text}\" is never readable")
         elif lesson > chapter.lesson:
             notes.append(f"sentence \"{sentence.text}\" is readable from lesson {lesson}")
-        pieces = _sentence_text(pack, sentence, grey, chapter).lines()
+        pieces = _sentence_text(pack, sentence, grey, chapter, capitals).lines()
         if not paragraphs or item.brk == packs.NEW_PARAGRAPH:
-            paragraphs.append(Paragraph(_paragraph_font(pack, chapter, len(paragraphs)), [[]]))
+            paragraphs.append(Paragraph(_paragraph_font(pack, chapter, len(paragraphs), cursive), [[]]))
         elif item.brk == packs.NEW_LINE:
             paragraphs[-1].lines.append([])
         paragraphs[-1].lines[-1].append(pieces[0])
@@ -421,7 +430,7 @@ def _paragraphs(pack: Pack, chapter: Chapter, grey: bool, notes: list[str]) -> l
     return paragraphs
 
 
-def _sentence_pool(pack: Pack, chapter: Chapter, grey: bool) -> tuple[list[tuple[int, Styled]], set[int]]:
+def _sentence_pool(pack: Pack, chapter: Chapter, grey: bool, capitals: bool) -> tuple[list[tuple[int, Styled]], set[int]]:
     """What a chapter that picks no sentence chooses from: the sentences readable
     at its lesson, exceptions left out. Those with a word holding one of its GPs
     come first, then the others, since the point is to fill the pages; within
@@ -438,13 +447,13 @@ def _sentence_pool(pack: Pack, chapter: Chapter, grey: bool) -> tuple[list[tuple
         ranked.append(((not teaches, not sentence.booklet_only, sentence.id), sentence))
     ranked.sort(key=lambda pair: pair[0])
     teaching = {sentence.id for key, sentence in ranked if not key[0]}
-    return [(sentence.id, _sentence_text(pack, sentence, grey, chapter)) for _, sentence in ranked], teaching
+    return [(sentence.id, _sentence_text(pack, sentence, grey, chapter, capitals)) for _, sentence in ranked], teaching
 
 
-def _paragraph_font(pack: Pack, chapter: Chapter, index: int) -> str:
+def _paragraph_font(pack: Pack, chapter: Chapter, index: int, cursive: bool) -> str:
     """Script and cursive alternate by paragraph, unless the chapter asks for
-    one only; a language written without cursive prints everything in script."""
-    if not pack.cursive:
+    one only; the script series prints everything in script."""
+    if not cursive:
         return SCRIPT
     font = int(pack.setting(chapter, "SentenceFont"))
     if font == packs.SCRIPT:

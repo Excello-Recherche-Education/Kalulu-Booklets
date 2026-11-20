@@ -107,7 +107,9 @@ def test_a_hyphenated_word_is_its_own_or_its_parts(pack_folder):
 
 
 def _capitals(pack_folder, share, words=(), syllables=(), sentences=()):
-    execute(pack_folder, "UPDATE BookletSettings SET UppercaseProportion = ?", share)
+    # Capitals print in the script series only.
+    execute(pack_folder, "UPDATE BookletSettings SET UppercaseProportion = ?, ScriptSeries = 1, CursiveSeries = 0",
+            share)
     for table, ids in (("Words", words), ("Syllables", syllables), ("Sentences", sentences)):
         for item_id in ids:
             execute(pack_folder, f"UPDATE {table} SET Uppercase = 1 WHERE ID = ?", item_id)
@@ -162,8 +164,8 @@ def test_breaks_make_lines_and_paragraphs(pack_folder):
     assert [paragraph.font for paragraph in chapter.paragraphs] == [CURSIVE, SCRIPT]
 
 
-def test_a_language_without_cursive_prints_sentences_in_script(pack_folder):
-    execute(pack_folder, "UPDATE BookletSettings SET Cursive = 0")
+def test_the_script_series_prints_sentences_in_script(pack_folder):
+    execute(pack_folder, "UPDATE BookletSettings SET ScriptSeries = 1, CursiveSeries = 0")
     chapter_id = add_chapter(pack_folder, 3, [3], SentenceFont=2)
     add_sentences(pack_folder, chapter_id, [2, 2])
     chapter = own(content.booklet(load(pack_folder), 1).chapters)[0]
@@ -229,3 +231,16 @@ def test_a_chapter_its_lesson_reads_no_sentence_of_says_so(pack_folder):
     booklet = content.booklet(load(pack_folder), 1)
     assert own(booklet.chapters)[0].sentence_pool == []
     assert "Lesson 2, chapter 1: no sentence is readable at this lesson" in booklet.notes
+
+
+def test_a_language_with_both_series_prints_capitals_in_the_script_one_only(pack_folder):
+    _capitals(pack_folder, 1 / 3, words=[2])
+    execute(pack_folder, "UPDATE BookletSettings SET CursiveSeries = 1")
+    chapter_id = add_chapter(pack_folder, 3, [3, 4, 5], WordCount=4, SentenceFont=2)
+    add_sentences(pack_folder, chapter_id, [2])
+    pack = load(pack_folder)
+    assert pack.series == ("script", "cursive")
+    script, cursive = (own(content.booklet(pack, 1, series).chapters)[0] for series in pack.series)
+    assert "LUNE" in texts(script.words) and "LUNE" not in texts(cursive.words)
+    assert [p.font for p in script.paragraphs] == [SCRIPT] and [p.font for p in cursive.paragraphs] == [CURSIVE]
+    assert (script.writing_font, cursive.writing_font) == (SCRIPT, CURSIVE)

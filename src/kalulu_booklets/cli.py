@@ -36,7 +36,8 @@ def main(argv: list[str] | None = None) -> int:
     build.add_argument("--booklet", type=int, action="append",
                        help="only this booklet; may be repeated (default: every booklet)")
     build.add_argument("--version", choices=list(VERSIONS), action="append",
-                       help="only this version; may be repeated (default: every version)")
+                       help="only this version, if the language prints it; may be repeated "
+                            "(default: every version the language prints)")
     build.add_argument("--out", type=Path, default=REPOSITORY / "build",
                        help="folder to write to (default: build/)")
     arguments = parser.parse_args(argv)
@@ -64,7 +65,16 @@ def main(argv: list[str] | None = None) -> int:
               f"it has {', '.join(map(str, pack.booklets())) or 'none'}", file=sys.stderr)
         return 2
 
-    versions = [VERSIONS[name] for name in dict.fromkeys(arguments.version or VERSIONS)]
+    asked = list(dict.fromkeys(arguments.version or pack.versions))
+    left_out = [name for name in asked if name not in pack.versions]
+    if left_out:
+        print(f"{pack.locale} prints no {', '.join(left_out)} version (its BookletSettings): left out")
+    versions = [VERSIONS[name] for name in asked if name in pack.versions]
+    if not versions:
+        print(f"error: {pack.locale} prints none of the versions asked", file=sys.stderr)
+        return 2
+    # A language printing both series names them in its files.
+    series_names = pack.series
     if any(version.teacher for version in versions) and not any(
             pack.chapter_picture(chapter) for chapter in pack.chapters):
         print(f"{pack.locale}: no Look & Learn or booklet image found (not checked out?): "
@@ -75,19 +85,24 @@ def main(argv: list[str] | None = None) -> int:
         # A note from one version's layout is said once, with the versions
         # that gave it when not all of them did.
         said: dict[str, list[str]] = {}
-        for version in versions:
-            booklet = content.booklet(pack, number)
-            folder = arguments.out / pack.locale / version.name
-            path = folder / version.file_name(pack.locale, number)
-            imposed = folder / version.file_name(pack.locale, number, imposed=True) if version.printed else None
-            pages = layout.write(booklet, faces, path, version, imposed)
-            print(f"{path}  ({pages} pages, {len(booklet.chapters)} chapter(s))")
-            if imposed is not None:
-                print(f"{imposed}  ({pages // 2} A4 sheet sides, for printing)")
-            for note in dict.fromkeys(booklet.notes):
-                said.setdefault(note, []).append(version.name)
+        runs = 0
+        for series in series_names:
+            named = series if len(series_names) > 1 else ""
+            for version in versions:
+                booklet = content.booklet(pack, number, series)
+                folder = arguments.out / pack.locale / version.name
+                path = folder / version.file_name(pack.locale, number, series=named)
+                imposed = (folder / version.file_name(pack.locale, number, imposed=True, series=named)
+                           if version.printed else None)
+                pages = layout.write(booklet, faces, path, version, imposed)
+                print(f"{path}  ({pages} pages, {len(booklet.chapters)} chapter(s))")
+                if imposed is not None:
+                    print(f"{imposed}  ({pages // 2} A4 sheet sides, for printing)")
+                runs += 1
+                for note in dict.fromkeys(booklet.notes):
+                    said.setdefault(note, []).append(f"{version.name} {series}" if named else version.name)
         for note, by in said.items():
-            which = "" if len(by) == len(versions) else f" [{', '.join(by)}]"
+            which = "" if len(by) == runs else f" [{', '.join(by)}]"
             notes.append(f"booklet {number}, {note}{which}")
     notes.extend(fonts.missing_notes(faces, {role: font.name for role, font in pack.fonts.items()}))
     if notes:

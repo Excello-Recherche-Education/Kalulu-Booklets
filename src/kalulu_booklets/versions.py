@@ -18,6 +18,10 @@ change is how the pages are made:
   graphemes, and adhd draws no animal (adapted.py, and Kalulu-Main's
   docs/booklet-versions/ for the measurements).
 
+A language says which versions it prints besides the base booklet, and whether
+in a script series, a cursive series or both (Kalulu-Languages SCHEMA.md,
+``BookletSettings``; ``Pack.versions`` and ``Pack.series``).
+
 The base and no-writing versions are also written for printing: A4 landscape,
 two A5 pages a sheet, in the order a folded and stapled booklet reads them.
 """
@@ -57,9 +61,12 @@ class Version:
         labels = dict(self.labels)
         return labels.get(locale.split("_")[0], labels.get("fr", ""))
 
-    def file_name(self, locale: str, number: int, imposed: bool = False) -> str:
+    def file_name(self, locale: str, number: int, imposed: bool = False, series: str = "") -> str:
+        """``series`` ("script", "cursive") is named only for a language that
+        prints both: its two series sit side by side in each version's folder."""
         suffix = "" if self.name == "base" else f"-{self.name}"
-        return f"{locale}-booklet-{number}{suffix}{'-print' if imposed else ''}.pdf"
+        series_suffix = f"-{series}" if series else ""
+        return f"{locale}-booklet-{number}{suffix}{series_suffix}{'-print' if imposed else ''}.pdf"
 
 
 BASE = Version("base", printed=True)
