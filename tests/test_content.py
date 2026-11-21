@@ -45,6 +45,15 @@ def test_a_count_below_one_row_is_kept(pack_folder):
     assert not [note for note in booklet.notes if "every row is full" in note]
 
 
+def test_a_grid_of_exactly_its_picks_prints_them_all(pack_folder):
+    # A printed booklet's grid: 7 words in 3 columns, the last one alone and centred.
+    chapter_id = add_chapter(pack_folder, 3, [3], WordCount=7, WordColumns=3)
+    add_entries(pack_folder, chapter_id, 2, ["lune", "une", "nu", "Luna", "lune", "une", "nu"])
+    booklet = content.booklet(load(pack_folder), 1)
+    assert texts(own(booklet.chapters)[0].words) == ["lune", "une", "nu", "Luna", "lune", "une", "nu"]
+    assert not [note for note in booklet.notes if "every row is full" in note]
+
+
 def test_syllables_repeat_until_the_count(pack_folder):
     _, chapter = chapter_content(pack_folder, SyllableCount=5)
     assert texts(chapter.syllables) == ["nu", "lu", "un", "nu", "lu"]

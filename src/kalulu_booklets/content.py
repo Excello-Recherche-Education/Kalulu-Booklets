@@ -195,8 +195,10 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str], cursive: bool, capi
         notes.append(f"its booklet image {f'booklet_images/{image.file}' if image else chapter.image_id} cannot be "
                      "printed: missing, not a PNG or JPEG, or not checked out (Git LFS); its teacher page is left out")
     syllable_columns, word_columns = int(setting("SyllableColumns")), int(setting("WordColumns"))
-    syllable_count = _whole_rows(int(setting("SyllableCount")), syllable_columns, "Syllable", notes)
-    word_count = _whole_rows(int(setting("WordCount")), word_columns, "Word", notes)
+    syllable_count = _whole_rows(int(setting("SyllableCount")), syllable_columns, "Syllable", notes,
+                                 len(chapter.entries.get(packs.SYLLABLES, [])))
+    word_count = _whole_rows(int(setting("WordCount")), word_columns, "Word", notes,
+                             len(chapter.entries.get(packs.WORDS, [])))
     syllable_choice = _picked(pack, chapter, packs.SYLLABLES, syllable_count, notes, capitals)
     word_choice = _picked(pack, chapter, packs.WORDS, word_count, notes, capitals)
     syllables = arranged(syllable_choice, syllable_count, syllable_columns, _seed(chapter, packs.SYLLABLES))
@@ -238,11 +240,14 @@ def _chapter(pack: Pack, chapter: Chapter, notes: list[str], cursive: bool, capi
 
 # --- Syllables and words ---------------------------------------------------------
 
-def _whole_rows(count: int, columns: int, kind: str, notes: list[str]) -> int:
+def _whole_rows(count: int, columns: int, kind: str, notes: list[str], picks: int = 0) -> int:
     """A grid fills every row it starts (the PO's rule, 2026-11-09): 7 words in
     3 columns leave one alone on the last row, so 6 are printed. A count below
-    one row is kept: it prints as one row of its own."""
-    if columns < 1 or count <= columns or count % columns == 0:
+    one row is kept: it prints as one row of its own. So is a grid that is
+    exactly its picks, as a printed booklet laid it out (the user, 2026-11-21:
+    as close to the print as possible): every pick is printed, its last row
+    centred, as printed."""
+    if columns < 1 or count <= columns or count % columns == 0 or count == picks:
         return count
     whole = count - count % columns
     notes.append(f"{kind}Count is {count} in {columns} columns: {whole} are printed, "

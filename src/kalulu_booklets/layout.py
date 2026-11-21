@@ -342,9 +342,14 @@ class Layout:
 
         # Every item at the same size, a long one spilling out of its cell:
         # a smaller one among the others reads as different.
+        # A last row short of the others (a grid printed as its picks) is
+        # centred under them, as the printed booklets centre it.
+        last = len(items) - (rows - 1) * columns
+
         def draw(canvas: Canvas) -> None:
             for index, item in enumerate(items):
-                center_x = LEFT + (index % columns + 0.5) * cell
+                shift = (columns - last) / 2 if index // columns == rows - 1 else 0
+                center_x = LEFT + (index % columns + 0.5 + shift) * cell
                 center_y = top - (index // columns + 0.5) * row
                 face.draw(canvas, center_x - face.width(item.text, size) / 2,
                           center_y - face.x_height * size / 2, item.text, size, INK, item.grey, SILENT)
