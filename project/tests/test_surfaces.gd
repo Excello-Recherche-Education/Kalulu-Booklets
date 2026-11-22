@@ -101,7 +101,7 @@ func test_canvas_draws_every_operation() -> void:
 	var surface := CanvasSurface.new(A5, item, 2.0, Vector2(10, 10))
 	_draw_page(surface, script, cursive)
 	_draw_page(surface, script, cursive)
-	var art := VectorArt.read(ProjectSettings.globalize_path("res://").path_join("../src/kalulu_booklets/art/kalulu-logo.svg").simplify_path())
+	var art := BookletArt.vector("kalulu-logo")
 	assert_eq(art.error, "")
 	surface.vector(art, 10.0, 580.0, 120.0)
 	assert_almost_eq(surface.page_offset(1), A5.y * 2.0 + 16.0, 1e-6, "the second page below the first")

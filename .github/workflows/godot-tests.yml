@@ -2,8 +2,9 @@ name: Godot Tests
 
 # The Godot port of the generator (project/): its GUT tests, which compare it
 # with the Python generator. The committed fixtures (project/tests/fixtures/)
-# hold what does not depend on the packs; what does (every pack's content) is
-# written here from the pinned packs by tools/godot_content.py, then compared.
+# hold what does not depend on the packs; what does (every pack's content, and
+# every booklet's drawing operations) is written here from the pinned packs by
+# tools/godot_content.py and tools/godot_layout.py, then compared.
 
 on:
   pull_request:
@@ -36,10 +37,11 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Write the expected content from the Python generator
+      - name: Write the expected content and drawing from the Python generator
         run: |
           python -m pip install --quiet .
           python tools/godot_content.py
+          python tools/godot_layout.py
 
       - name: Download Godot
         run: |

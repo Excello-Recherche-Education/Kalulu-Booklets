@@ -26,7 +26,7 @@ func _init() -> void:
 	var folder := FontSet.pinned_folder()
 	var script := FontFace.new(FileAccess.get_file_as_bytes(folder.path_join(FontSet.SCRIPT)), FontSet.SCRIPT)
 	var cursive := FontFace.new(FileAccess.get_file_as_bytes(folder.path_join(FontSet.CURSIVE)), FontSet.CURSIVE)
-	var art_folder := ProjectSettings.globalize_path("res://").path_join("../src/kalulu_booklets/art").simplify_path()
+	var art_folder := BookletArt.FOLDER
 	var surface := CanvasSurface.new(A5, page.get_canvas_item(), SCALE)
 	surface.save()
 	surface.fill_color(Color(0.5, 0.2, 0.1))

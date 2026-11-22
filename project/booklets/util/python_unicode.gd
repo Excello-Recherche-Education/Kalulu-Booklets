@@ -63,6 +63,29 @@ static func upper_full(text: String) -> String:
 	return "".join(out)
 
 
+## Whether any character of ``text`` is one ``str.isalnum()`` is true of: a
+## letter or a digit of any script.
+static func has_alnum(text: String) -> bool:
+	for index in text.length():
+		if is_alnum_code(text.unicode_at(index)):
+			return true
+	return false
+
+
+static func is_alnum_code(code: int) -> bool:
+	var ranges := PythonUnicodeTables.ALNUM_RANGES
+	# The last range starting at or before ``code``, by binary search.
+	var low := 0
+	var high := ranges.size() / 2 - 1
+	while low <= high:
+		var middle := (low + high) / 2
+		if ranges[middle * 2] <= code:
+			low = middle + 1
+		else:
+			high = middle - 1
+	return high >= 0 and code <= ranges[high * 2 + 1]
+
+
 static func is_space(character: String) -> bool:
 	return PythonUnicodeTables.SPACES.has(character.unicode_at(0))
 

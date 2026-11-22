@@ -67,3 +67,8 @@ func _codes(text: String) -> String:
 	for character in text:
 		out.append("%04X" % character.unicode_at(0))
 	return " ".join(out)
+
+
+func test_alnum_matches_python() -> void:
+	for case: Array in _fixture()["alnum_texts"]:
+		assert_eq(PythonUnicode.has_alnum(case[0]), case[1], "isalnum in %s" % _codes(case[0]))

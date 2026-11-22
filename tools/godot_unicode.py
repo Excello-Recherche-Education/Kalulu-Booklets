@@ -58,6 +58,15 @@ def tables() -> str:
             if unicodedata.normalize("NFC", pair) == chr(code):
                 compositions[pair] = code
     classes = {code: unicodedata.combining(chr(code)) for code in MARKS if unicodedata.combining(chr(code))}
+    alnum: list[int] = []
+    start = None
+    for code in [*characters(), 0x110000]:
+        is_alnum = code < 0x110000 and chr(code).isalnum()
+        if is_alnum and start is None:
+            start = code
+        elif not is_alnum and start is not None:
+            alnum += [start, code - 1]
+            start = None
 
     def mapping(name: str, table: dict, key, value) -> list[str]:
         lines = [f"const {name} := {{"]
@@ -86,6 +95,11 @@ def tables() -> str:
         *mapping("COMPOSITIONS", compositions, gd_string, lambda v: f"0x{v:04X}"),
         "## Canonical combining classes of the combining marks (0300-036F).",
         *mapping("COMBINING_CLASSES", classes, lambda k: f"0x{k:04X}", str),
+        "## The characters str.isalnum() is true of, as [first, last] ranges, in order.",
+        "const ALNUM_RANGES: Array[int] = [",
+        *[f"\t{', '.join(f'0x{code:04X}' for code in alnum[index:index + 8])}," for index in range(0, len(alnum), 8)],
+        "]",
+        "",
     ]
     return "\n".join(out)
 
@@ -102,6 +116,9 @@ def fixture() -> dict:
         "unicode": unicodedata.unidata_version,
         "cases": {str(code): [chr(code).lower(), chr(code).upper()] for code in CASES},
         "spaces": [code for code in range(0x3001) if chr(code).isspace()],
+        "alnum_texts": [[text, any(character.isalnum() for character in text)]
+                        for text in ["«", "»", "!?", "…", "—", "a", "é", "١", "²", "Ⅻ", "¿¡", "«Oh", "x»", "...",
+                                     "-", "'", "’", "%", "€", "ß", "ǅ", "ᾳ", "中", "🙂", "", " "]],
         "normalized": [[sample, unicodedata.normalize("NFC", sample), unicodedata.normalize("NFD", sample)]
                        for sample in dict.fromkeys(samples)],
         "strip": [[text, text.strip(), text.lstrip(), text.rstrip()]
