@@ -262,6 +262,42 @@ font's empty box. A letter the font has no glyph for but can build from its
 parts is printed that way: Marelle has no `á`, and prints it as `a` and an
 accent.
 
+## The Godot port (in progress)
+
+The generator is being ported to Godot, so that the
+[Prof Tool](https://github.com/Excello-Recherche-Education/Kalulu-ProfTool) can
+carry it on every platform and preview a chapter as it is edited. The plan and
+its phases are Kalulu-Main's `docs/BOOKLETS-GODOT-PORT.md`. Until the port is
+finished, **the Python generator above is the reference**: it still builds the
+released booklets, and the Godot code is checked against it.
+
+The Godot project is `project/` (Godot 4.7), and the generator's code is
+`project/booklets/`, which the Prof Tool will copy as it is:
+
+| Folder | What it holds |
+|---|---|
+| `fonts/` | `FontFace` (shaping with TextServer, widths, ink, drawing), `FontSet`, `TextSpacing`, `OutlineBounds` |
+| `surface/` | what the layout draws on: `PdfSurface` (the booklet), `CanvasSurface` (the preview), `RecordingSurface` (the parity checks) |
+| `pdf/` | `PdfWriter` and `OpenTypeInfo`: vector PDF with the fonts embedded whole |
+| `art/` | `VectorArt`, the SVG reader for the cover's logo and star |
+| `random/` | `PythonRandom`, Python's `random.Random` number for number, and the `Sha512` its seeding needs |
+| `util/` | `StableSort`, Python's `sorted()` |
+
+Its tests use [GUT](https://github.com/bitwes/Gut) (`project/addons/gut/`, MIT)
+and compare it with the Python generator through fixtures that
+`tools/godot_fixtures.py` writes into `project/tests/fixtures/`:
+
+```bash
+.venv/bin/python tools/godot_fixtures.py                     # after a font or the Python code changes
+godot --headless --path project --import
+godot --headless --path project -s res://addons/gut/gut_cmdln.gd -gexit
+```
+
+They need `kalulu-languages/fonts`, so a clone made with `--recurse-submodules`.
+A fixture written for a font that has changed since is reported, not compared.
+`project/tools/canvas_snapshot.gd` draws a sample page with the preview's surface
+into a PNG, to compare with the PDF by eye (it needs a window, not `--headless`).
+
 ## License
 
 This project, the generator and the booklets it produces, is licensed under the

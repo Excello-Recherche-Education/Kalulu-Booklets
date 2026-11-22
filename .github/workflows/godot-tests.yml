@@ -1,0 +1,43 @@
+name: Godot Tests
+
+# The Godot port of the generator (project/): its GUT tests, which compare it
+# with the Python generator through the fixtures in project/tests/fixtures/.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  gut:
+    runs-on: ubuntu-latest
+    env:
+      GODOT_VERSION: 4.7-stable
+      GODOT_BIN: godot/Godot_v4.7-stable_linux.x86_64
+      # The tests read only the fonts, which are not in LFS.
+      GIT_LFS_SKIP_SMUDGE: "1"
+    steps:
+      - name: Check out the generator, the pinned packs and their fonts
+        uses: actions/checkout@v5
+        with:
+          # recursive: the fonts are kalulu-languages/fonts, a submodule of it.
+          submodules: recursive
+          lfs: false
+
+      - name: Download Godot
+        run: |
+          GODOT_ZIP=Godot_v${GODOT_VERSION}_linux.x86_64.zip
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/${GODOT_ZIP}"
+          unzip -q godot.zip -d godot
+          chmod +x "${GODOT_BIN}"
+
+      - name: Import the project
+        run: |
+          "${GODOT_BIN}" --headless --path project --import
+
+      - name: Run the tests
+        # GUT exits non-zero when a test fails.
+        run: |
+          "${GODOT_BIN}" --headless --path project -s res://addons/gut/gut_cmdln.gd -gexit

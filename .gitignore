@@ -17,3 +17,6 @@ venv/
 
 # Agent notes are kept in Kalulu-Main (docs/agent/) and symlinked here
 CLAUDE.md
+
+# Godot
+project/.godot/
