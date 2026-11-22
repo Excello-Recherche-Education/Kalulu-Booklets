@@ -62,7 +62,7 @@ static func find(pack_folder: String, replaced: Dictionary = {}, fallback: Strin
 		candidates.append(pack_folder.path_join("../fonts").simplify_path())
 	candidates.append(fallback if not fallback.is_empty() else pinned_folder())
 	for folder: String in candidates:
-		if files.values().all(func(file: String) -> bool: return FileAccess.file_exists(folder.path_join(file))):
+		if files.values().all(func(file: String) -> bool: return has_font(folder.path_join(file))):
 			return {"folder": folder, "error": ""}
 	var looked_for := "Mulish and Marelle"
 	if not replaced.is_empty():
@@ -84,9 +84,27 @@ static func from_folder(folder: String, replaced: Dictionary = {}) -> FontSet:
 		files.merge(replaced, true)
 		var faces := {}
 		for role in ROLES:
-			faces[role] = FontFace.new(FileAccess.get_file_as_bytes(folder.path_join(files[role])), files[role])
+			faces[role] = FontFace.new(font_bytes(folder.path_join(files[role])), files[role])
 		_loaded[key] = FontSet.new(faces)
 	return _loaded[key]
+
+
+## Whether ``path`` is a font the booklets can print with (see font_bytes()).
+static func has_font(path: String) -> bool:
+	return FileAccess.file_exists(path) or (path.begins_with("res://") and ResourceLoader.exists(path))
+
+
+## A font file's bytes: the file itself, or, in an exported project, where a
+## font under res:// is there only as Godot imported it (the Prof Tool's
+## res://fonts/), the imported font's copy of them, which is the same bytes.
+static func font_bytes(path: String) -> PackedByteArray:
+	if FileAccess.file_exists(path):
+		return FileAccess.get_file_as_bytes(path)
+	if path.begins_with("res://") and ResourceLoader.exists(path):
+		var font := load(path) as FontFile
+		if font != null:
+			return font.data
+	return PackedByteArray()
 
 
 ## Lets go of the faces loaded so far; the next from_folder() reads them again.

@@ -78,3 +78,24 @@ func test_each_page_names_the_chapters_on_it() -> void:
 		expected.sort()
 		assert_eq(found, expected, version.name)
 		laid_out.release()
+
+
+## The Prof Tool exports the generator: what it reads byte for byte must be in
+## an exported project as it is. Its fonts come as Godot imports them
+## (FontSet.font_bytes()), its pictures are kept as they are.
+func test_the_pictures_are_exported_as_they_are() -> void:
+	for file in DirAccess.get_files_at(BookletArt.FOLDER):
+		if file.ends_with(".import"):
+			var config := ConfigFile.new()
+			config.load(BookletArt.FOLDER.path_join(file))
+			assert_eq(config.get_value("remap", "importer", ""), "keep", file)
+
+
+func test_a_font_s_bytes_are_its_file_s() -> void:
+	if pack_folder.is_empty():
+		return
+	var path := FontSet.pinned_folder().path_join(FontSet.SCRIPT)
+	assert_true(FontSet.has_font(path))
+	assert_eq(FontSet.font_bytes(path), FileAccess.get_file_as_bytes(path))
+	assert_false(FontSet.has_font("res://nowhere/Nothing.otf"))
+	assert_eq(FontSet.font_bytes("res://nowhere/Nothing.otf").size(), 0)
