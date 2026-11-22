@@ -20,3 +20,8 @@ CLAUDE.md
 
 # Godot
 project/.godot/
+
+# godot-sqlite binaries: installed per machine by tools/setup.sh, never committed
+project/addons/godot-sqlite/bin/
+# What tools/godot_content.py writes from the packs for the Godot tests
+project/tests/generated/

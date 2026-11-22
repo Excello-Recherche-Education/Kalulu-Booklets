@@ -136,11 +136,30 @@ def vector_fixture() -> dict:
     return out
 
 
+def versions_fixture() -> dict:
+    from kalulu_booklets.versions import VERSIONS
+
+    out = {}
+    for name, version in VERSIONS.items():
+        color = version.label_color
+        out[name] = {
+            "labels": {locale: version.label(locale) for locale in ("fr_FR", "es_AR", "pt_BR", "it_IT")},
+            "label_color": None if color is None else [color.red, color.green, color.blue],
+            "label_bold": version.label_bold, "writing": version.writing, "teacher": version.teacher,
+            "folded": version.folded, "printed": version.printed, "adapted": version.adapted,
+            "adaptations": list(version.adaptations), "readers": dict(version.readers),
+            "file_names": [version.file_name("fr_FR", 2), version.file_name("pt_BR", 1, True, "cursive"),
+                           version.file_name("es_AR", 3, False, "script")],
+        }
+    return {"order": list(VERSIONS), "versions": out}
+
+
 def main() -> int:
     write("python_random.json", random_fixture())
     write("sha512.json", sha512_fixture())
     write("fonts.json", fonts_fixture())
     write("vector_art.json", vector_fixture())
+    write("versions.json", versions_fixture())
     return 0
 
 

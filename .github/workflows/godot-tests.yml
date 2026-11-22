@@ -1,7 +1,9 @@
 name: Godot Tests
 
 # The Godot port of the generator (project/): its GUT tests, which compare it
-# with the Python generator through the fixtures in project/tests/fixtures/.
+# with the Python generator. The committed fixtures (project/tests/fixtures/)
+# hold what does not depend on the packs; what does (every pack's content) is
+# written here from the pinned packs by tools/godot_content.py, then compared.
 
 on:
   pull_request:
@@ -16,7 +18,10 @@ jobs:
     env:
       GODOT_VERSION: 4.7-stable
       GODOT_BIN: godot/Godot_v4.7-stable_linux.x86_64
-      # The tests read only the fonts, which are not in LFS.
+      # Matches project/addons/godot-sqlite/plugin.cfg.
+      SQLITE_VERSION: v4.7
+      # The tests read language.db and the fonts, which are not in LFS. The
+      # pictures are, and both generators then find none, alike.
       GIT_LFS_SKIP_SMUDGE: "1"
     steps:
       - name: Check out the generator, the pinned packs and their fonts
@@ -26,12 +31,44 @@ jobs:
           submodules: recursive
           lfs: false
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Write the expected content from the Python generator
+        run: |
+          python -m pip install --quiet .
+          python tools/godot_content.py
+
       - name: Download Godot
         run: |
           GODOT_ZIP=Godot_v${GODOT_VERSION}_linux.x86_64.zip
           curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/${GODOT_ZIP}"
           unzip -q godot.zip -d godot
           chmod +x "${GODOT_BIN}"
+
+      # The godot-sqlite libraries are in no repository (tools/setup.sh copies
+      # them from Kalulu-Frontend on a developer's machine); BookletPackReader
+      # needs them to open a pack.
+      - name: Cache godot-sqlite library
+        id: sqlite-cache
+        uses: actions/cache@v4
+        with:
+          path: project/addons/godot-sqlite/bin
+          key: godot-sqlite-${{ env.SQLITE_VERSION }}-linux-x86_64
+
+      - name: Download godot-sqlite library
+        if: steps.sqlite-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -sSL -o sqlite-bin.zip \
+            "https://github.com/2shady4u/godot-sqlite/releases/download/${SQLITE_VERSION}/bin.zip"
+          # Only the Linux debug library: running a project from source uses
+          # the debug build.
+          unzip -q -o sqlite-bin.zip 'bin/libgdsqlite.linux.template_debug.x86_64.so' \
+            -d project/addons/godot-sqlite/
+          rm sqlite-bin.zip
+          test -f project/addons/godot-sqlite/bin/libgdsqlite.linux.template_debug.x86_64.so
 
       - name: Import the project
         run: |
