@@ -12,6 +12,7 @@ config_version=5
 
 config/name="Kalulu Booklets"
 config/description="The reading booklets' generator: lays a language pack's booklets out and writes them as PDF."
+run/main_scene="res://cli/build_command.tscn"
 config/features=PackedStringArray("4.7")
 
 [editor_plugins]

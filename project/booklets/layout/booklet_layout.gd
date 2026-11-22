@@ -175,6 +175,14 @@ func _init(laid_out: BookletContent.Booklet, faces: FontSet, booklet_version: Bo
 
 # --- Pages -------------------------------------------------------------------------
 
+## Lets go of the pages once they are drawn. Their steps are lambdas that may
+## hold this layout, which holds them: a cycle reference counting never frees,
+## so whoever lays a booklet out calls this when done with its pages (the
+## writer does), or every preview drawn would stay in memory.
+func release() -> void:
+	pages.clear()
+
+
 func new_page(numbered: bool = true, shares_next_number: bool = false) -> Page:
 	pages.append(Page.new(numbered, shares_next_number))
 	y = TOP
