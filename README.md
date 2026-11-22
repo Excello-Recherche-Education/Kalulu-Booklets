@@ -111,8 +111,11 @@ tools/setup.sh
 
 It copies the godot-sqlite desktop libraries into `project/addons/godot-sqlite/bin/`
 from a Kalulu-Frontend checkout (`$KALULU_FRONTEND`, or one beside this
-repository); without one, install godot-sqlite 4.7 there by hand. Then import the
-project once:
+repository); without one, install godot-sqlite 4.7 there by hand. It then imports
+the project, which writes the list of classes the scripts find each other by
+(Godot from `$GODOT`, else `godot` on the `PATH`). **Re-run it after each pull**:
+until the next import, a new script is unknown, and the command line stops with
+`the project's class list is out of date`. The import alone is:
 
 ```bash
 godot --headless --path project --import
