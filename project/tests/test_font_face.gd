@@ -1,7 +1,9 @@
 extends GutTest
 ## FontFace against the Python generator's Face, HarfBuzz and fontTools, on
 ## the four fonts the booklets print with (tests/fixtures/fonts.json, written
-## by tools/godot_fixtures.py from kalulu-languages/fonts).
+## by tools/godot_fixtures.py at 338cae2, the last commit with the Python generator, from kalulu-languages/fonts). A font changed in Kalulu-Fonts
+## since leaves its tests pending: to check it again, run that script at that
+## commit with the new font in place.
 
 var _fixture: Dictionary
 
@@ -23,7 +25,7 @@ func _faces() -> Dictionary:
 		hashing.start(HashingContext.HASH_SHA256)
 		hashing.update(bytes)
 		if hashing.finish().hex_encode() != _fixture["fonts"][file]["sha256"]:
-			pending("%s changed since tests/fixtures/fonts.json was written: run tools/godot_fixtures.py" % file)
+			pending("%s changed since tests/fixtures/fonts.json was written: rewrite it with tools/godot_fixtures.py at 338cae2" % file)
 			continue
 		faces[file] = FontFace.new(bytes, file)
 	return faces

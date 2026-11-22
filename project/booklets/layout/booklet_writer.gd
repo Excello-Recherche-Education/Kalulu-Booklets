@@ -3,7 +3,8 @@ extends RefCounted
 ## Draws a laid out booklet on a DrawingSurface: its pages with their numbers,
 ## and, for printing, its A4 sheets. ``pdf()`` writes it as a PDF file's bytes.
 ##
-## A port of ``layout.write()`` and its helpers in the Python generator.
+## Ported from the Python generator (``layout.write()``), removed once a
+## release built by this one matched it page for page.
 
 const A4_LANDSCAPE := Vector2(297.0 * BookletLayout.MM, 210.0 * BookletLayout.MM)
 const A5 := Vector2(BookletLayout.PAGE_WIDTH, BookletLayout.PAGE_HEIGHT)
@@ -90,7 +91,7 @@ static func _save(path: String, bytes: PackedByteArray) -> bool:
 	return true
 
 
-## The PDF's document information, as the Python generator writes it.
+## The PDF's document information.
 static func info_for(booklet: BookletContent.Booklet, version: BookletVersion) -> Dictionary:
 	var suffix := "" if version == null or version.name == "base" else " - " + version.name
 	return {"Title": "Kalulu - %s - %d%s" % [booklet.locale, booklet.number, suffix],

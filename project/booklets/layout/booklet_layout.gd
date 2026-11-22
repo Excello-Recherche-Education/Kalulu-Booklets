@@ -10,9 +10,8 @@ extends RefCounted
 ## DrawingSurface, so that blank pages can be added before the back cover to
 ## reach a multiple of four (a booklet is printed on folded sheets).
 ##
-## A port of the Python generator's ``layout.py``, which stays the reference
-## until the port is finished: the same booklet draws the same operations
-## (tests/test_layout.gd).
+## Ported from the Python generator's ``layout.py``, operation for operation:
+## the first release this port built matched the last Python one page for page.
 
 const MM := 72.0 / 25.4
 const PAGE_WIDTH := 148.0 * MM

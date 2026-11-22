@@ -1,6 +1,7 @@
 extends GutTest
 ## PythonRandom against Python's random.Random, and Sha512 against hashlib
-## (tools/godot_fixtures.py writes both fixtures).
+## (both fixtures written by tools/godot_fixtures.py at 338cae2, the last
+## commit with the Python generator).
 
 
 func _fixture(name: String) -> Variant:

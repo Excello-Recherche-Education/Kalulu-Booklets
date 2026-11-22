@@ -84,8 +84,7 @@ jobs:
           "${GODOT_BIN}" --headless --path project --import
 
       - name: Run the tests
-        # GUT exits non-zero when a test fails. The comparisons with the Python
-        # generator have nothing to compare here and are pending.
+        # GUT exits non-zero when a test fails.
         run: |
           "${GODOT_BIN}" --headless --path project -s res://addons/gut/gut_cmdln.gd -gexit
 

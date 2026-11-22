@@ -1,6 +1,7 @@
 extends GutTest
 ## VectorArt against the Python generator's vector.py, on the art it draws
-## (tests/fixtures/vector_art.json), and what it refuses.
+## (tests/fixtures/vector_art.json, written by tools/godot_fixtures.py at 338cae2, the last commit with the Python generator), and what it
+## refuses.
 
 
 func _art_folder() -> String:

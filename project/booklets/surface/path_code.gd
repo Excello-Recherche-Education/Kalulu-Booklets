@@ -2,8 +2,8 @@ class_name PathCode
 extends RefCounted
 ## A path's steps for DrawingSurface.path(), built as ReportLab's
 ## PDFPathObject builds them: the same calls make the same curves, number for
-## number, so the booklets' bubbles, stopwatches and rounded boxes are the
-## Python generator's.
+## number, so the booklets' bubbles, stopwatches and rounded boxes stayed the
+## ones the Python generator drew.
 
 ## The steps so far: [operator, numbers...] each.
 var code: Array = []
