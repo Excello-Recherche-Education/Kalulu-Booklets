@@ -140,6 +140,11 @@ class Page:
 	var numbered := true
 	## A teacher's page carries the number of the chapter page after it.
 	var shares_next_number := false
+	## The IDs of the chapters laid out on it (keys; the values mean nothing):
+	## none for the covers and the blank pages, sometimes two where a chapter
+	## starts on the page another ends on. The Prof Tool previews a chapter's
+	## pages by them.
+	var chapter_ids: Dictionary = {}
 
 	func _init(is_numbered: bool = true, shares_next: bool = false) -> void:
 		numbered = is_numbered
@@ -147,6 +152,8 @@ class Page:
 
 
 var booklet: BookletContent.Booklet
+## The chapter being laid out, null outside the chapters (Page.chapter_ids).
+var laying: BookletContent.ChapterContent = null
 var fonts: FontSet
 var version: BookletVersion
 ## Chapter ID -> the sentences chosen for a chapter that picks none, in the
@@ -184,6 +191,8 @@ func release() -> void:
 
 func new_page(numbered: bool = true, shares_next_number: bool = false) -> Page:
 	pages.append(Page.new(numbered, shares_next_number))
+	if laying != null:
+		pages[-1].chapter_ids[laying.chapter.id] = true
 	y = TOP
 	after_grid = false
 	return pages[-1]
@@ -199,6 +208,8 @@ func room() -> float:
 
 func add(step: Callable) -> void:
 	page().steps.append(step)
+	if laying != null:
+		page().chapter_ids[laying.chapter.id] = true
 
 
 func note(chapter: BookletContent.ChapterContent, text: String) -> void:
@@ -220,7 +231,9 @@ func _wider_than(chapter: BookletContent.ChapterContent, face: FontFace, texts: 
 func run() -> Array[Page]:
 	cover()
 	for chapter in booklet.chapters:
+		laying = chapter
 		lay_chapter(chapter)
+	laying = null
 	# Blank pages before the back cover, to fill the last folded sheet. A
 	# version not printed as a booklet (the teacher's) is not folded.
 	while version.folded and (pages.size() + 1) % 4 != 0:

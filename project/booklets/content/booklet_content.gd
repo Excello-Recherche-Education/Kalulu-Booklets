@@ -211,7 +211,14 @@ class Booklet:
 ## ``CursiveSeries``). The cursive series also prints its titles, sentences and
 ## writing pages in cursive; capitals are printed in the script series only, as
 ## the printed Brazilian booklets have them.
-static func booklet(pack: BookletPack, number: int, series: String = "") -> Booklet:
+##
+## ``cache`` keeps each chapter's content between calls, for a caller that lays
+## the same booklet out again and again (the Prof Tool's preview): chapter ID
+## -> [ChapterContent, its notes], filled here for the chapters it lacks. A
+## chapter's content depends on the pack, the series and that chapter only, so
+## the caller erases a chapter's ID when that chapter changes, and empties it
+## when the pack, its settings or the series do.
+static func booklet(pack: BookletPack, number: int, series: String = "", cache: Variant = null) -> Booklet:
 	if series.is_empty():
 		series = pack.series()[0]
 	var cursive := series == CURSIVE
@@ -221,7 +228,14 @@ static func booklet(pack: BookletPack, number: int, series: String = "") -> Book
 		if chapter.booklet != number:
 			continue
 		var notes: Array[String] = []
-		var content := _chapter(pack, chapter, notes, cursive, capitals)
+		var content: ChapterContent
+		if cache != null and (cache as Dictionary).has(chapter.id):
+			content = cache[chapter.id][0]
+			notes = cache[chapter.id][1]
+		else:
+			content = _chapter(pack, chapter, notes, cursive, capitals)
+			if cache != null:
+				cache[chapter.id] = [content, notes]
 		for note in notes:
 			result.notes.append("%s: %s" % [chapter.name(), note])
 		if content.is_empty():
