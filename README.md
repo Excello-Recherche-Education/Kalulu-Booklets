@@ -71,7 +71,7 @@ cd Kalulu-Booklets
 Forgot `--recurse-submodules`?
 
 ```bash
-git submodule update --init
+git submodule update --init --recursive
 ```
 
 The language packs include every app sound, image and video, so the first
@@ -90,6 +90,7 @@ the latest packs:
 
 ```bash
 git submodule update --remote kalulu-languages
+git -C kalulu-languages submodule update --init
 git add kalulu-languages
 git commit -m "Bump language packs"
 ```
@@ -233,18 +234,20 @@ submodule must be checked out.
 
 ## Fonts
 
-The booklets print with the fonts of the language packs, kept in
-Kalulu-Languages' [`fonts/`](https://github.com/Excello-Recherche-Education/Kalulu-Languages/tree/main/fonts)
-folder: no copy of them is kept here. They are read from the Kalulu-Languages
-checkout the pack is in (`../Kalulu-Languages/fonts` for
-`../Kalulu-Languages/fr_FR`), or else from `kalulu-languages/fonts`.
+The booklets print with the fonts of the language packs, Kalulu-Languages'
+`fonts/`, which is itself a submodule: the
+[Kalulu-Fonts](https://github.com/Excello-Recherche-Education/Kalulu-Fonts)
+repository, which every Kalulu repository that uses a font mounts. No copy of
+them is kept here. They are read from the Kalulu-Languages checkout the pack is
+in (`../Kalulu-Languages/fonts` for `../Kalulu-Languages/fr_FR`), or else from
+`kalulu-languages/fonts`, which is why the clone above recurses.
 
 | Font | File | Used for |
 |---|---|---|
 | Mulish, the version modified for Kalulu | `mulish/kalulu_mulish_{regular,bold,black}.otf` | script |
 | Marelle 2 | `marelle/Marelle2-Regular.ttf` | cursive (shorter loops than Marelle) |
 
-Both are under the SIL Open Font License 1.1; see `fonts/LICENSE.md` there.
+Both are under the SIL Open Font License 1.1; see Kalulu-Fonts' `LICENSE.md`.
 The PDFs embed the letters they use, which the license allows.
 
 **A language can replace any of the four**, the three weights of Mulish or

@@ -1,7 +1,8 @@
 """The booklets' fonts, shaped with HarfBuzz and drawn glyph by glyph.
 
 The fonts are not kept here: they live in Kalulu-Languages, in ``fonts/`` beside
-the packs (its ``LICENSE.md`` says what each file is). Mulish prints script,
+the packs, which is the Kalulu-Fonts repository as a submodule (its
+``LICENSE.md`` says what each file is). Mulish prints script,
 in the version modified for Kalulu, and Marelle prints cursive.
 
 Marelle joins its letters through OpenType rules (contextual alternates,
