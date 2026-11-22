@@ -169,6 +169,7 @@ func _init(laid_out: BookletContent.Booklet, faces: FontSet, booklet_version: Bo
 		base.run()
 		booklet.notes.assign(notes)
 		chosen = base.chosen
+		base.release()
 
 
 ## A height ``millimetres`` from the top of the page.

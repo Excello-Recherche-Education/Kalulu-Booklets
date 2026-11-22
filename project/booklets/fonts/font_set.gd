@@ -85,6 +85,11 @@ static func from_folder(folder: String, replaced: Dictionary = {}) -> FontSet:
 	return _loaded[key]
 
 
+## Lets go of the faces loaded so far; the next from_folder() reads them again.
+static func forget() -> void:
+	_loaded.clear()
+
+
 ## What the build says about the characters a face met and cannot print.
 ## ``names`` gives the pack's name for a replaced role's font.
 func missing_notes(names: Dictionary = {}) -> Array[String]:

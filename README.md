@@ -97,29 +97,44 @@ git commit -m "Bump language packs"
 
 ## Requirements
 
-- Python 3.11 or newer
+- [Godot](https://godotengine.org/) 4.7: the generator is a Godot project,
+  `project/`, run from the command line
+- the [godot-sqlite](https://github.com/2shady4u/godot-sqlite) 4.7 binaries,
+  which no repository carries (see below)
 - Git
 
 ## Installing
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install -e '.[dev]'
+tools/setup.sh
 ```
 
-This installs [ReportLab](https://www.reportlab.com/) for the PDF and
-[uharfbuzz](https://github.com/harfbuzz/uharfbuzz) (HarfBuzz) for text shaping:
-the cursive font joins its letters through OpenType rules, which only a shaping
-engine applies.
+It copies the godot-sqlite desktop libraries into `project/addons/godot-sqlite/bin/`
+from a Kalulu-Frontend checkout (`$KALULU_FRONTEND`, or one beside this
+repository); without one, install godot-sqlite 4.7 there by hand. Then import the
+project once:
+
+```bash
+godot --headless --path project --import
+```
+
+The cursive font joins its letters through OpenType rules, which only a shaping
+engine applies: Godot's TextServer (HarfBuzz) shapes the text, and the generator
+writes the PDF itself, with the fonts embedded.
 
 ## Generating the booklets
 
 ```bash
-.venv/bin/kalulu-booklets build fr_FR                         # the pack pinned in kalulu-languages/
-.venv/bin/kalulu-booklets build ../Kalulu-Languages/fr_FR     # any pack folder, saved or not
-.venv/bin/kalulu-booklets build fr_FR --booklet 1 --out /tmp/booklets
-.venv/bin/kalulu-booklets build fr_FR --version teacher       # one version only
+godot --headless --no-header --path project -- build fr_FR                        # the pack pinned in kalulu-languages/
+godot --headless --no-header --path project -- build ../Kalulu-Languages/fr_FR    # any pack folder, saved or not
+godot --headless --no-header --path project -- build fr_FR --booklet 1 --out /tmp/booklets
+godot --headless --no-header --path project -- build fr_FR --version teacher      # one version only
 ```
+
+`godot` is the Godot 4.7 binary. Godot runs from the `project/` folder, but a
+relative path is taken from the folder the command is typed in, and printed as
+given. The command exits with 0 when the booklets are written, 1 when the pack
+has nothing to print, and 2 when it refuses the pack or the arguments.
 
 A bare locale reads the pack pinned in `kalulu-languages/`; a path reads any pack
 folder (or its `language.db`), such as a Kalulu-Languages checkout the Prof Tool
@@ -226,11 +241,14 @@ stored in the pack's `Booklet*` tables: see "The reading booklets" in the packs'
 ### Tests
 
 ```bash
-.venv/bin/python -m pytest
+godot --headless --path project -s res://addons/gut/gut_cmdln.gd -gexit
 ```
 
-They build a small pack from the schema in `kalulu-languages/schema/`, so the
-submodule must be checked out.
+[GUT](https://github.com/bitwes/Gut) tests, in `project/tests/`. Most build a
+small pack from the schema in `kalulu-languages/schema/`
+(`project/tests/helpers/tiny_pack.gd`), so the submodule must be checked out.
+The rest compare the generator with the Python one it was ported from; see "The
+Godot port".
 
 ## Fonts
 
@@ -262,20 +280,23 @@ font's empty box. A letter the font has no glyph for but can build from its
 parts is printed that way: Marelle has no `á`, and prints it as `a` and an
 accent.
 
-## The Godot port (in progress)
+## The Godot port
 
-The generator is being ported to Godot, so that the
+The generator was first written in Python (`src/kalulu_booklets/`, with its
+pytest tests in `tests/`), and has been ported to Godot, so that the
 [Prof Tool](https://github.com/Excello-Recherche-Education/Kalulu-ProfTool) can
 carry it on every platform and preview a chapter as it is edited. The plan and
-its phases are Kalulu-Main's `docs/BOOKLETS-GODOT-PORT.md`. Until the port is
-finished, **the Python generator above is the reference**: it still builds the
-released booklets, and the Godot code is checked against it.
+its phases are Kalulu-Main's `docs/BOOKLETS-GODOT-PORT.md`. **The Godot generator
+is the one used**: the command line and the release above. The Python one stays
+until it is removed, as the reference the Godot one is checked against; to run
+it, `python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'`.
 
-The Godot project is `project/` (Godot 4.7), and the generator's code is
-`project/booklets/`, which the Prof Tool will copy as it is:
+The generator's code is `project/booklets/`, which the Prof Tool will copy as it
+is, and the command line `project/cli/`:
 
 | Folder | What it holds |
 |---|---|
+| `booklets/booklet_build.gd` | `BookletBuild`: a pack's booklets written as PDF files, with the report the command line prints (`cli.py`) |
 | `fonts/` | `FontFace` (shaping with TextServer, widths, ink, drawing), `FontSet`, `TextSpacing`, `OutlineBounds` |
 | `surface/` | what the layout draws on: `PdfSurface` (the booklet), `CanvasSurface` (the preview), `RecordingSurface` (the parity checks); `PathCode`, paths built as ReportLab builds them |
 | `pdf/` | `PdfWriter` and `OpenTypeInfo`: vector PDF with the fonts embedded whole |

@@ -3,7 +3,9 @@ name: Release Booklets
 # Builds the booklets of every language pack and publishes them, all in one
 # GitHub release, as one zip per language: Kalulu-Booklets-<locale>.zip holds a
 # folder of that language's PDFs, a subfolder per version (base, teacher,
-# no-writing, dyslexia, dyspraxia, adhd: versions.py), as the generator writes them, and its build notes.
+# no-writing, dyslexia, dyspraxia, adhd: BookletVersion), as the generator writes
+# them, and its build notes. The generator is the Godot project, project/, run
+# from the command line (project/cli/build_command.gd).
 # Run by hand: Actions -> Release Booklets -> Run workflow.
 #
 # The booklets are never committed (build/ is ignored): this release is where
@@ -31,6 +33,10 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
+      GODOT_VERSION: 4.7-stable
+      GODOT_BIN: godot/Godot_v4.7-stable_linux.x86_64
+      # Matches project/addons/godot-sqlite/plugin.cfg.
+      SQLITE_VERSION: v4.7
       # The packs' media (~1.3 GB) are in Git LFS, and the booklets need only
       # the Look & Learn and booklet images (the teacher's pages), fetched below:
       # language.db is a plain file, and fonts/ is Kalulu-Languages' own
@@ -57,18 +63,31 @@ jobs:
       - name: Fetch the Look & Learn and booklet images
         run: git -C kalulu-languages lfs pull --include "*/look_and_learn/images/*,*/booklet_images/*"
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install the generator
+      - name: Download Godot
         run: |
-          python -m pip install --quiet --upgrade pip
-          python -m pip install --quiet ".[dev]"
+          GODOT_ZIP=Godot_v${GODOT_VERSION}_linux.x86_64.zip
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/${GODOT_ZIP}"
+          unzip -q godot.zip -d godot
+          chmod +x "${GODOT_BIN}"
+
+      # The godot-sqlite libraries are in no repository; the generator reads
+      # language.db with them.
+      - name: Download godot-sqlite
+        run: |
+          curl -sSL -o sqlite-bin.zip \
+            "https://github.com/2shady4u/godot-sqlite/releases/download/${SQLITE_VERSION}/bin.zip"
+          unzip -q -o sqlite-bin.zip 'bin/libgdsqlite.linux.template_debug.x86_64.so' -d project/addons/godot-sqlite/
+          test -f project/addons/godot-sqlite/bin/libgdsqlite.linux.template_debug.x86_64.so
+
+      - name: Import the project
+        run: |
+          "${GODOT_BIN}" --headless --path project --import
 
       - name: Run the tests
-        run: python -m pytest -q
+        # GUT exits non-zero when a test fails. The comparisons with the Python
+        # generator have nothing to compare here and are pending.
+        run: |
+          "${GODOT_BIN}" --headless --path project -s res://addons/gut/gut_cmdln.gd -gexit
 
       - name: Build every language's booklets
         id: build
@@ -83,11 +102,11 @@ jobs:
             [[ "$locale" =~ ^[a-z]{2}_[A-Z]{2}$ && -f "$pack/language.db" ]] || continue
             locales="$locales $locale"
             echo "::group::$locale"
-            # The folder, not the bare locale: a bare locale is looked up beside
-            # the installed package, which is only this checkout when the
-            # generator is installed in editable mode.
-            kalulu-booklets build "kalulu-languages/$locale" --out build > "build/$locale.log" 2>&1 || failed="$failed $locale"
-            cat "build/$locale.log"
+            # Relative paths are taken from here ($PWD), and printed as given.
+            # Godot's own messages at exit go to stderr, kept apart from the notes.
+            "${GODOT_BIN}" --headless --no-header --path project -- build "kalulu-languages/$locale" --out build \
+              > "build/$locale.log" 2> "build/$locale.err" || failed="$failed $locale"
+            cat "build/$locale.log" "build/$locale.err"
             echo "::endgroup::"
           done
           if [[ -z "$locales" ]]; then

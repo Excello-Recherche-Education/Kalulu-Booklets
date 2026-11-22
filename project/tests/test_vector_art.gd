@@ -71,6 +71,7 @@ func test_refuses_what_it_does_not_read() -> void:
 	var head := "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 10 10\">"
 	assert_string_contains(_refused(head + "<circle r=\"3\"/></svg>"), "<circle> is not read")
 	assert_string_contains(_refused(head + "<path d=\"M 0 0 Q 1 1 2 2\"/></svg>"), "does not read")
+	assert_string_contains(_refused(head + "<path fill=\"#000000\" d=\"M0 0 l5 5 Z\"/></svg>"), "does not read")
 	assert_string_contains(_refused(head + "<path d=\"M 0 0 L 1\"/></svg>"), "L needs 2 numbers")
 	assert_string_contains(_refused("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"1 0 10 10\"></svg>"),
 			"not starting at 0 0")

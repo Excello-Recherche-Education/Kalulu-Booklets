@@ -18,7 +18,8 @@ static func layout_for(booklet: BookletContent.Booklet, fonts: FontSet, version:
 
 
 ## Lays out ``booklet`` in ``version`` and draws its pages on ``surface``, one
-## after the other; returns the layout, whose ``pages`` say how many.
+## after the other; returns the layout, whose ``pages`` say how many. Call its
+## ``release()`` when done with them.
 static func draw(surface: DrawingSurface, booklet: BookletContent.Booklet, fonts: FontSet,
 		version: BookletVersion = null, chosen: Variant = null) -> BookletLayout:
 	var laid_out := layout_for(booklet, fonts, version, chosen)
@@ -57,7 +58,36 @@ static func pdf(booklet: BookletContent.Booklet, fonts: FontSet, version: Bookle
 		var sheets := PdfSurface.new(A4_LANDSCAPE, info)
 		draw_imposed(sheets, laid_out)
 		printed = sheets.finish()
+	laid_out.release()
 	return [surface.finish(), printed]
+
+
+## Lays out and writes one booklet in one version to ``path``, and, given
+## ``imposed_path``, its A4 printing copy there; returns its number of pages,
+## or -1 when a file cannot be written. Folders are made as needed.
+static func write(booklet: BookletContent.Booklet, fonts: FontSet, path: String, version: BookletVersion = null,
+		imposed_path: String = "", chosen: Variant = null) -> int:
+	var info := info_for(booklet, version)
+	var surface := PdfSurface.new(A5, info)
+	var laid_out := draw(surface, booklet, fonts, version, chosen)
+	var count := laid_out.pages.size()
+	var written := _save(path, surface.finish())
+	if written and not imposed_path.is_empty():
+		var sheets := PdfSurface.new(A4_LANDSCAPE, info)
+		draw_imposed(sheets, laid_out)
+		written = _save(imposed_path, sheets.finish())
+	laid_out.release()
+	return count if written else -1
+
+
+static func _save(path: String, bytes: PackedByteArray) -> bool:
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_buffer(bytes)
+	file.close()
+	return true
 
 
 ## The PDF's document information, as the Python generator writes it.

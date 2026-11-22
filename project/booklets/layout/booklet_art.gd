@@ -38,3 +38,9 @@ static func vector(name: String) -> VectorArt:
 	if not _vectors.has(name):
 		_vectors[name] = VectorArt.read(FOLDER.path_join(name + ".svg"))
 	return _vectors[name]
+
+
+## Lets go of the pictures read so far.
+static func forget() -> void:
+	_pictures.clear()
+	_vectors.clear()
