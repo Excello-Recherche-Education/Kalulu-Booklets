@@ -293,7 +293,7 @@ platform; the command line is `project/cli/`.
 
 | Folder | What it holds |
 |---|---|
-| `booklets/booklet_build.gd` | `BookletBuild`: a pack's booklets written as PDF files, with the report the command line prints |
+| `booklets/booklet_build.gd` | `BookletBuild`: a pack's booklets written as PDF files, with the report the command line prints; `build()` from a pack's folder, `build_pack()` from a `BookletPack` in memory (the Prof Tool's, unsaved edits included) |
 | `fonts/` | `FontFace` (shaping with TextServer, widths, ink, drawing), `FontSet`, `TextSpacing`, `OutlineBounds` |
 | `surface/` | what the layout draws on: `PdfSurface` (the booklet), `CanvasSurface` (the preview), `RecordingSurface` (for tests); `PathCode`, paths built as ReportLab builds them |
 | `pdf/` | `PdfWriter` and `OpenTypeInfo`: vector PDF with the fonts embedded whole |

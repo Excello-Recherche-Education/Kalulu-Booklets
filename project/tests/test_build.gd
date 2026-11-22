@@ -53,6 +53,27 @@ func test_builds_one_pdf_per_booklet() -> void:
 	assert_string_contains(built["said"], "xx_XX-booklet-1.pdf")
 
 
+func test_a_pack_in_memory_builds_what_its_folder_builds() -> void:
+	if pack_folder.is_empty():
+		return
+	Tiny.add_chapter(pack_folder, 2, [2], {"Title": "L l"})
+	var from_folder := _build()
+	var pack := BookletPackReader.new().read(pack_folder)
+	var out := pack_folder.get_base_dir().path_join("memory")
+	var said: Array[String] = []
+	var code := BookletBuild.new(func(line: String) -> void: said.append(line)).build_pack(pack, [], [], out)
+	assert_eq(code, 0)
+	var file := "xx_XX/base/xx_XX-booklet-1.pdf"
+	assert_eq(FileAccess.get_file_as_bytes(out.path_join(file)),
+			FileAccess.get_file_as_bytes(from_folder["out"].path_join(file)))
+	assert_eq("\n".join(said).replace(out, "OUT"), from_folder["said"].replace(from_folder["out"], "OUT"))
+	# What the pack holds in memory is what is printed: the Prof Tool's unsaved edits.
+	pack.chapters.filter(func(chapter: BookletPack.Chapter) -> bool: return chapter.lesson == 2)[0].title = "Lu"
+	BookletBuild.new(func(_line: String) -> void: pass).build_pack(pack, [], [], out)
+	assert_ne(FileAccess.get_file_as_bytes(out.path_join(file)),
+			FileAccess.get_file_as_bytes(from_folder["out"].path_join(file)))
+
+
 func test_a_pack_without_chapters_prints_one_per_lesson() -> void:
 	if pack_folder.is_empty():
 		return
