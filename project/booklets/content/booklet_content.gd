@@ -8,9 +8,8 @@ extends RefCounted
 ## and their fonts, the silent letters to print in grey. Nothing here knows
 ## about pages; the layout places what comes out of it.
 ##
-## A port of the Python generator's ``content.py``, which stays the reference
-## until the port is finished: the same pack gives the same content, to the
-## letter and to the grid (tests/test_pack_content.gd).
+## Ported from the Python generator's ``content.py``: it gave the same content,
+## to the letter and to the grid, on every pack.
 
 const SCRIPT := "script"
 const CURSIVE := "cursive"

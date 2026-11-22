@@ -28,7 +28,7 @@ extends BookletLayout
 ## Every measurement is a baseline-to-baseline distance or a position from the
 ## page's top or left edge, in millimetres, as the reports give them.
 ##
-## A port of the Python generator's ``adapted.py``.
+## Ported from the Python generator's ``adapted.py``.
 
 const ADAPTED_SILENT := Color(0x7f / 255.0, 0x7f / 255.0, 0x7f / 255.0)
 const TINTS := {

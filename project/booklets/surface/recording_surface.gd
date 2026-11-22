@@ -1,8 +1,8 @@
 class_name RecordingSurface
 extends DrawingSurface
-## Records every operation instead of drawing it, page by page, for the parity
-## checks against the Python generator: the same drawing must come out of both,
-## operation for operation (Kalulu-Main's docs/BOOKLETS-GODOT-PORT.md, section 5).
+## Records every operation instead of drawing it, page by page, for tests that
+## look at what a layout draws (it was how the port was checked against the
+## Python generator, operation for operation).
 ##
 ## ``pages`` is an array of pages, each an array of operations, each a
 ## dictionary with its "op" and its arguments. Colours are [r, g, b].

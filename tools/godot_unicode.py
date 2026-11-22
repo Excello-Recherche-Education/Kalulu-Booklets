@@ -1,7 +1,7 @@
 """Writes the Unicode tables the Godot port needs to treat text as Python does,
 and the fixture its tests check them with.
 
-    .venv/bin/python tools/godot_unicode.py
+    python3 tools/godot_unicode.py
 
 - ``project/booklets/util/python_unicode_tables.gd``: what ``str.isspace()``
   calls whitespace; the characters whose ``str.lower()`` / ``str.upper()`` is

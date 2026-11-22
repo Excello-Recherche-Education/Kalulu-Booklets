@@ -18,7 +18,7 @@ educational app that helps children learn to read through the decoding
 > on a star, as the previous booklets did; the back cover's artwork is still to
 > come. The pages carry the game's characters: the parakeet under the
 > fluency test's speech bubble, beside two stopwatches, the penguin above the
-> tables and the caterpillar on the writing pages (`src/kalulu_booklets/art/`,
+> tables and the caterpillar on the writing pages (`project/booklets/art/`,
 > whose `LICENSE.md` says where each comes from).
 
 ## What it produces
@@ -250,8 +250,8 @@ godot --headless --path project -s res://addons/gut/gut_cmdln.gd -gexit
 [GUT](https://github.com/bitwes/Gut) tests, in `project/tests/`. Most build a
 small pack from the schema in `kalulu-languages/schema/`
 (`project/tests/helpers/tiny_pack.gd`), so the submodule must be checked out.
-The rest compare the generator with the Python one it was ported from; see "The
-Godot port".
+The rest check it against values written from the Python generator it was
+ported from (`project/tests/fixtures/`); see "How it was ported".
 
 ## Fonts
 
@@ -283,71 +283,59 @@ font's empty box. A letter the font has no glyph for but can build from its
 parts is printed that way: Marelle has no `á`, and prints it as `a` and an
 accent.
 
-## The Godot port
+## The generator's code
 
-The generator was first written in Python (`src/kalulu_booklets/`, with its
-pytest tests in `tests/`), and has been ported to Godot, so that the
-[Prof Tool](https://github.com/Excello-Recherche-Education/Kalulu-ProfTool) can
-carry it on every platform and preview a chapter as it is edited. The plan and
-its phases are Kalulu-Main's `docs/BOOKLETS-GODOT-PORT.md`. **The Godot generator
-is the one used**: the command line and the release above. The Python one stays
-until it is removed, as the reference the Godot one is checked against; to run
-it, `python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'`.
-
-The generator's code is `project/booklets/`, which the Prof Tool will copy as it
-is, and the command line `project/cli/`:
+The generator is a Godot 4.7 project, `project/`. Its code is
+`project/booklets/`, which the
+[Prof Tool](https://github.com/Excello-Recherche-Education/Kalulu-ProfTool) will
+copy as it is, to preview a chapter as it is edited and build booklets on every
+platform; the command line is `project/cli/`.
 
 | Folder | What it holds |
 |---|---|
-| `booklets/booklet_build.gd` | `BookletBuild`: a pack's booklets written as PDF files, with the report the command line prints (`cli.py`) |
+| `booklets/booklet_build.gd` | `BookletBuild`: a pack's booklets written as PDF files, with the report the command line prints |
 | `fonts/` | `FontFace` (shaping with TextServer, widths, ink, drawing), `FontSet`, `TextSpacing`, `OutlineBounds` |
-| `surface/` | what the layout draws on: `PdfSurface` (the booklet), `CanvasSurface` (the preview), `RecordingSurface` (the parity checks); `PathCode`, paths built as ReportLab builds them |
+| `surface/` | what the layout draws on: `PdfSurface` (the booklet), `CanvasSurface` (the preview), `RecordingSurface` (for tests); `PathCode`, paths built as ReportLab builds them |
 | `pdf/` | `PdfWriter` and `OpenTypeInfo`: vector PDF with the fonts embedded whole |
 | `pack/` | `BookletPack`, what the booklets read from a pack, a model that depends on nothing; `BookletPackReader`, which fills it from `language.db` with [godot-sqlite](https://github.com/2shady4u/godot-sqlite) |
-| `content/` | `BookletContent`, what each chapter prints (`content.py`); `BookletText`, how text is cut into words (`text.py`); `BookletVersion` (`versions.py`) |
-| `layout/` | `BookletLayout` and `AdaptedLayout`, what goes on each page (`layout.py`, `adapted.py`); `BookletWriter`, the pages drawn with their numbers, the A4 printing copy and the PDF (`layout.write()`); `BookletArt`, the pictures |
-| `art/` | the characters and the cover's drawings, a copy of `src/kalulu_booklets/art/` until the Python generator goes (a test keeps the two the same), and `VectorArt`, the SVG reader |
+| `content/` | `BookletContent`, what each chapter prints; `BookletText`, how text is cut into words; `BookletVersion` |
+| `layout/` | `BookletLayout` and `AdaptedLayout`, what goes on each page; `BookletWriter`, the pages drawn with their numbers, the A4 printing copy and the PDF; `BookletArt`, the pictures |
+| `art/` | the characters and the cover's drawings (`LICENSE.md` there), and `VectorArt`, the SVG reader |
 | `random/` | `PythonRandom`, Python's `random.Random` number for number, and the `Sha512` its seeding needs |
 | `util/` | `StableSort`, Python's `sorted()`; `PythonUnicode`, Python's case mapping, whitespace and NFC / NFD where Godot's differ or are missing |
 
 The godot-sqlite binaries are in no repository. `tools/setup.sh` copies the
 desktop ones from a Kalulu-Frontend checkout (`$KALULU_FRONTEND`, or one beside
 this repository); otherwise install godot-sqlite 4.7 into
-`project/addons/godot-sqlite/bin/` by hand.
-
-Its tests use [GUT](https://github.com/bitwes/Gut) (`project/addons/gut/`, MIT)
-and compare it with the Python generator two ways:
-
-- **fixtures that do not depend on the packs**, committed in
-  `project/tests/fixtures/`: `tools/godot_fixtures.py` writes the random
-  numbers, the fonts' shaping and bounds, the vector art and the versions,
-  `tools/godot_unicode.py` the Unicode tables (and
-  `project/booklets/util/python_unicode_tables.gd`);
-- **every pack's content and drawing**, written from the pinned packs into
-  `project/tests/generated/` (not committed: they follow the packs).
-  `tools/godot_content.py`: each pack must read as `pack.load()` reads it, and
-  every chapter of every booklet and series must hold what `content.booklet()`
-  puts in it, grids in the same order included. `tools/godot_layout.py` records
-  what the layout asks ReportLab's canvas to draw for every booklet, series and
-  version: the port must draw the same operations, positions within 0.001 pt,
-  and add the same notes.
-
-```bash
-tools/setup.sh                                               # once: the godot-sqlite binaries
-.venv/bin/python tools/godot_fixtures.py                     # after a font or the Python code changes
-.venv/bin/python tools/godot_content.py                      # before every run: the packs' content
-.venv/bin/python tools/godot_layout.py                       # and their drawing (~2 minutes)
-godot --headless --path project --import
-godot --headless --path project -s res://addons/gut/gut_cmdln.gd -gexit
-```
-
-They need `kalulu-languages/` and its `fonts`, so a clone made with
-`--recurse-submodules`. A fixture written for a font that has changed since is
-reported, not compared; without the two tools' output the content and layout
-tests are pending, not passed. The *Godot Tests* workflow runs all of it on every
-pull request.
+`project/addons/godot-sqlite/bin/` by hand. The tests use
+[GUT](https://github.com/bitwes/Gut) (`project/addons/gut/`, MIT); they need
+`kalulu-languages/` and its `fonts`, so a clone made with `--recurse-submodules`.
 `project/tools/canvas_snapshot.gd` draws a sample page with the preview's surface
 into a PNG, to compare with the PDF by eye (it needs a window, not `--headless`).
+
+### How it was ported
+
+The generator was first written in Python, with ReportLab and HarfBuzz, and
+ported to Godot in 2026 (Kalulu-Main's `docs/BOOKLETS-GODOT-PORT.md`). The port
+was checked against it on every pack: the same content, chapter for chapter;
+the same drawing, operation for operation, positions within 0.001 pt; and the
+first release built by Godot, `booklets-20261122-4`, held the same 140 PDFs and
+build notes as the Python one, page for page but for two pixels of
+antialiasing on four of 11,511 pages. The Python generator was then removed; it
+is in the history, last at `338cae2`.
+
+What keeps the booklets the same from then on:
+
+- `PythonRandom`, `StableSort` and `PythonUnicode` reproduce Python's random
+  numbers, sort order and text handling, so the grids the team reviewed are drawn
+  in the same order;
+- the fixtures in `project/tests/fixtures/` hold what Python, HarfBuzz and
+  fontTools answered: the random numbers, the fonts' shaping and bounds, the
+  vector art, the versions, the Unicode tables. They were written by
+  `tools/godot_fixtures.py` at `338cae2`; a font changed in Kalulu-Fonts since
+  leaves its tests pending until that script, at that commit, writes them again.
+  `tools/godot_unicode.py` (Python's standard library only) still writes the
+  Unicode tables and their fixture.
 
 ## License
 

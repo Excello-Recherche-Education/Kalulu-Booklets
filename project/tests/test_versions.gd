@@ -1,6 +1,6 @@
 extends GutTest
-## BookletVersion against versions.py (tools/godot_fixtures.py writes the
-## fixture), and BookletPackReader's refusals.
+## BookletVersion against the Python generator's versions.py (the fixture was
+## written by tools/godot_fixtures.py at 338cae2, the last commit with the Python generator), and BookletPackReader's refusals.
 
 
 func test_versions_match_python() -> void:
