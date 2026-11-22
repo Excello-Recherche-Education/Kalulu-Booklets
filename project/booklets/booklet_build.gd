@@ -40,12 +40,23 @@ func build(pack_folder: String, numbers: Array[int] = [], versions: Array[String
 	if pack == null:
 		complain.call("error: " + reader.error)
 		return 2
+	return build_pack(pack, numbers, versions, out, shown_out)
+
+
+## The same from a pack already in memory: one BookletPackReader read, or one
+## the Prof Tool filled from what it is editing. Its fonts are those beside
+## ``pack.folder`` (see FontSet.find()), else ``fonts_fallback``'s ("" for the
+## pinned packs' own).
+func build_pack(pack: BookletPack, numbers: Array[int] = [], versions: Array[String] = [], out: String = "",
+		shown_out: String = "", fonts_fallback: String = "") -> int:
+	if shown_out.is_empty():
+		shown_out = out
 	var replaced := {}
 	var names := {}
 	for role: String in pack.fonts:
 		replaced[role] = pack.fonts[role].file
 		names[role] = pack.fonts[role].name
-	var found := FontSet.find(pack.folder, replaced)
+	var found := FontSet.find(pack.folder, replaced, fonts_fallback)
 	if not found["error"].is_empty():
 		complain.call("error: " + found["error"])
 		return 2

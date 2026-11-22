@@ -45,6 +45,16 @@ func test_without_them_the_pinned_ones_are_used() -> void:
 	assert_eq(FontSet.find(pack)["folder"], pinned)
 
 
+func test_the_fallback_folder_replaces_the_pinned_one() -> void:
+	if pinned.is_empty():
+		return
+	var other := _checkout(FontSet.DEFAULTS.values()).get_base_dir().path_join("fonts")
+	assert_eq(FontSet.find(_checkout([]), {}, other)["folder"], other)
+	# A pack with no folder (the Prof Tool's, before it is saved anywhere) uses it too.
+	assert_eq(FontSet.find("", {}, other)["folder"], other)
+	assert_string_contains(FontSet.find("", {}, "/nowhere")["error"], "/nowhere")
+
+
 func test_a_missing_font_is_an_error() -> void:
 	if pinned.is_empty():
 		return

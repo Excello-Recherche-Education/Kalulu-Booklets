@@ -50,13 +50,17 @@ static func pinned_folder() -> String:
 
 
 ## The fonts of the Kalulu-Languages checkout ``pack_folder`` is in; failing
-## that, those of the pinned packs. The folder must hold every file the
-## booklets print with: the defaults, and the files of ``replaced`` (role ->
+## that, those of ``fallback``: the pinned packs' when it is "" (this
+## repository), res://fonts/ in the Prof Tool. The folder must hold every file
+## the booklets print with: the defaults, and the files of ``replaced`` (role ->
 ## path inside fonts/) instead of those they replace. Returns {folder, error}.
-static func find(pack_folder: String, replaced: Dictionary = {}) -> Dictionary:
+static func find(pack_folder: String, replaced: Dictionary = {}, fallback: String = "") -> Dictionary:
 	var files := DEFAULTS.duplicate()
 	files.merge(replaced, true)
-	var candidates := [pack_folder.path_join("../fonts").simplify_path(), pinned_folder()]
+	var candidates: Array[String] = []
+	if not pack_folder.is_empty():
+		candidates.append(pack_folder.path_join("../fonts").simplify_path())
+	candidates.append(fallback if not fallback.is_empty() else pinned_folder())
 	for folder: String in candidates:
 		if files.values().all(func(file: String) -> bool: return FileAccess.file_exists(folder.path_join(file))):
 			return {"folder": folder, "error": ""}
