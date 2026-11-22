@@ -277,11 +277,12 @@ The Godot project is `project/` (Godot 4.7), and the generator's code is
 | Folder | What it holds |
 |---|---|
 | `fonts/` | `FontFace` (shaping with TextServer, widths, ink, drawing), `FontSet`, `TextSpacing`, `OutlineBounds` |
-| `surface/` | what the layout draws on: `PdfSurface` (the booklet), `CanvasSurface` (the preview), `RecordingSurface` (the parity checks) |
+| `surface/` | what the layout draws on: `PdfSurface` (the booklet), `CanvasSurface` (the preview), `RecordingSurface` (the parity checks); `PathCode`, paths built as ReportLab builds them |
 | `pdf/` | `PdfWriter` and `OpenTypeInfo`: vector PDF with the fonts embedded whole |
-| `art/` | `VectorArt`, the SVG reader for the cover's logo and star |
 | `pack/` | `BookletPack`, what the booklets read from a pack, a model that depends on nothing; `BookletPackReader`, which fills it from `language.db` with [godot-sqlite](https://github.com/2shady4u/godot-sqlite) |
 | `content/` | `BookletContent`, what each chapter prints (`content.py`); `BookletText`, how text is cut into words (`text.py`); `BookletVersion` (`versions.py`) |
+| `layout/` | `BookletLayout` and `AdaptedLayout`, what goes on each page (`layout.py`, `adapted.py`); `BookletWriter`, the pages drawn with their numbers, the A4 printing copy and the PDF (`layout.write()`); `BookletArt`, the pictures |
+| `art/` | the characters and the cover's drawings, a copy of `src/kalulu_booklets/art/` until the Python generator goes (a test keeps the two the same), and `VectorArt`, the SVG reader |
 | `random/` | `PythonRandom`, Python's `random.Random` number for number, and the `Sha512` its seeding needs |
 | `util/` | `StableSort`, Python's `sorted()`; `PythonUnicode`, Python's case mapping, whitespace and NFC / NFD where Godot's differ or are missing |
 
@@ -298,23 +299,27 @@ and compare it with the Python generator two ways:
   numbers, the fonts' shaping and bounds, the vector art and the versions,
   `tools/godot_unicode.py` the Unicode tables (and
   `project/booklets/util/python_unicode_tables.gd`);
-- **every pack's content**, written from the pinned packs by
-  `tools/godot_content.py` into `project/tests/generated/` (not committed: it
-  follows the packs). Each pack must read as `pack.load()` reads it, and every
-  chapter of every booklet and series must hold what `content.booklet()` puts in
-  it, grids in the same order included.
+- **every pack's content and drawing**, written from the pinned packs into
+  `project/tests/generated/` (not committed: they follow the packs).
+  `tools/godot_content.py`: each pack must read as `pack.load()` reads it, and
+  every chapter of every booklet and series must hold what `content.booklet()`
+  puts in it, grids in the same order included. `tools/godot_layout.py` records
+  what the layout asks ReportLab's canvas to draw for every booklet, series and
+  version: the port must draw the same operations, positions within 0.001 pt,
+  and add the same notes.
 
 ```bash
 tools/setup.sh                                               # once: the godot-sqlite binaries
 .venv/bin/python tools/godot_fixtures.py                     # after a font or the Python code changes
 .venv/bin/python tools/godot_content.py                      # before every run: the packs' content
+.venv/bin/python tools/godot_layout.py                       # and their drawing (~2 minutes)
 godot --headless --path project --import
 godot --headless --path project -s res://addons/gut/gut_cmdln.gd -gexit
 ```
 
 They need `kalulu-languages/` and its `fonts`, so a clone made with
 `--recurse-submodules`. A fixture written for a font that has changed since is
-reported, not compared; without `tools/godot_content.py`'s output the content
+reported, not compared; without the two tools' output the content and layout
 tests are pending, not passed. The *Godot Tests* workflow runs all of it on every
 pull request.
 `project/tools/canvas_snapshot.gd` draws a sample page with the preview's surface

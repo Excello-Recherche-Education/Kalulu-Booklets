@@ -4,7 +4,7 @@ extends GutTest
 
 
 func _art_folder() -> String:
-	return ProjectSettings.globalize_path("res://").path_join("../src/kalulu_booklets/art").simplify_path()
+	return BookletArt.FOLDER
 
 
 func test_reads_the_art_as_python_does() -> void:
