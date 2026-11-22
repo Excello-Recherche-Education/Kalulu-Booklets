@@ -280,21 +280,43 @@ The Godot project is `project/` (Godot 4.7), and the generator's code is
 | `surface/` | what the layout draws on: `PdfSurface` (the booklet), `CanvasSurface` (the preview), `RecordingSurface` (the parity checks) |
 | `pdf/` | `PdfWriter` and `OpenTypeInfo`: vector PDF with the fonts embedded whole |
 | `art/` | `VectorArt`, the SVG reader for the cover's logo and star |
+| `pack/` | `BookletPack`, what the booklets read from a pack, a model that depends on nothing; `BookletPackReader`, which fills it from `language.db` with [godot-sqlite](https://github.com/2shady4u/godot-sqlite) |
+| `content/` | `BookletContent`, what each chapter prints (`content.py`); `BookletText`, how text is cut into words (`text.py`); `BookletVersion` (`versions.py`) |
 | `random/` | `PythonRandom`, Python's `random.Random` number for number, and the `Sha512` its seeding needs |
-| `util/` | `StableSort`, Python's `sorted()` |
+| `util/` | `StableSort`, Python's `sorted()`; `PythonUnicode`, Python's case mapping, whitespace and NFC / NFD where Godot's differ or are missing |
+
+The godot-sqlite binaries are in no repository. `tools/setup.sh` copies the
+desktop ones from a Kalulu-Frontend checkout (`$KALULU_FRONTEND`, or one beside
+this repository); otherwise install godot-sqlite 4.7 into
+`project/addons/godot-sqlite/bin/` by hand.
 
 Its tests use [GUT](https://github.com/bitwes/Gut) (`project/addons/gut/`, MIT)
-and compare it with the Python generator through fixtures that
-`tools/godot_fixtures.py` writes into `project/tests/fixtures/`:
+and compare it with the Python generator two ways:
+
+- **fixtures that do not depend on the packs**, committed in
+  `project/tests/fixtures/`: `tools/godot_fixtures.py` writes the random
+  numbers, the fonts' shaping and bounds, the vector art and the versions,
+  `tools/godot_unicode.py` the Unicode tables (and
+  `project/booklets/util/python_unicode_tables.gd`);
+- **every pack's content**, written from the pinned packs by
+  `tools/godot_content.py` into `project/tests/generated/` (not committed: it
+  follows the packs). Each pack must read as `pack.load()` reads it, and every
+  chapter of every booklet and series must hold what `content.booklet()` puts in
+  it, grids in the same order included.
 
 ```bash
+tools/setup.sh                                               # once: the godot-sqlite binaries
 .venv/bin/python tools/godot_fixtures.py                     # after a font or the Python code changes
+.venv/bin/python tools/godot_content.py                      # before every run: the packs' content
 godot --headless --path project --import
 godot --headless --path project -s res://addons/gut/gut_cmdln.gd -gexit
 ```
 
-They need `kalulu-languages/fonts`, so a clone made with `--recurse-submodules`.
-A fixture written for a font that has changed since is reported, not compared.
+They need `kalulu-languages/` and its `fonts`, so a clone made with
+`--recurse-submodules`. A fixture written for a font that has changed since is
+reported, not compared; without `tools/godot_content.py`'s output the content
+tests are pending, not passed. The *Godot Tests* workflow runs all of it on every
+pull request.
 `project/tools/canvas_snapshot.gd` draws a sample page with the preview's surface
 into a PNG, to compare with the PDF by eye (it needs a window, not `--headless`).
 

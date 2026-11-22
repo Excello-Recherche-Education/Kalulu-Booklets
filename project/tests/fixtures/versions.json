@@ -1,0 +1,188 @@
+{
+ "order": [
+  "base",
+  "teacher",
+  "no-writing",
+  "dyslexia",
+  "dyspraxia",
+  "adhd"
+ ],
+ "versions": {
+  "base": {
+   "labels": {
+    "fr_FR": "",
+    "es_AR": "",
+    "pt_BR": "",
+    "it_IT": ""
+   },
+   "label_color": null,
+   "label_bold": false,
+   "writing": true,
+   "teacher": false,
+   "folded": true,
+   "printed": true,
+   "adapted": "",
+   "adaptations": [],
+   "readers": {},
+   "file_names": [
+    "fr_FR-booklet-2.pdf",
+    "pt_BR-booklet-1-cursive-print.pdf",
+    "es_AR-booklet-3-script.pdf"
+   ]
+  },
+  "teacher": {
+   "labels": {
+    "fr_FR": "Version enseignant",
+    "es_AR": "Versión docente",
+    "pt_BR": "Versão do professor",
+    "it_IT": "Version enseignant"
+   },
+   "label_color": [
+    0.1607843137254902,
+    0.21176470588235294,
+    0.49411764705882355
+   ],
+   "label_bold": true,
+   "writing": true,
+   "teacher": true,
+   "folded": false,
+   "printed": false,
+   "adapted": "",
+   "adaptations": [],
+   "readers": {},
+   "file_names": [
+    "fr_FR-booklet-2-teacher.pdf",
+    "pt_BR-booklet-1-teacher-cursive-print.pdf",
+    "es_AR-booklet-3-teacher-script.pdf"
+   ]
+  },
+  "no-writing": {
+   "labels": {
+    "fr_FR": "",
+    "es_AR": "",
+    "pt_BR": "",
+    "it_IT": ""
+   },
+   "label_color": null,
+   "label_bold": false,
+   "writing": false,
+   "teacher": false,
+   "folded": true,
+   "printed": true,
+   "adapted": "",
+   "adaptations": [],
+   "readers": {},
+   "file_names": [
+    "fr_FR-booklet-2-no-writing.pdf",
+    "pt_BR-booklet-1-no-writing-cursive-print.pdf",
+    "es_AR-booklet-3-no-writing-script.pdf"
+   ]
+  },
+  "dyslexia": {
+   "labels": {
+    "fr_FR": "Version différenciée",
+    "es_AR": "Versión diferenciada",
+    "pt_BR": "Versão diferenciada",
+    "it_IT": "Version différenciée"
+   },
+   "label_color": [
+    0.9686274509803922,
+    0.5764705882352941,
+    0.11372549019607843
+   ],
+   "label_bold": false,
+   "writing": true,
+   "teacher": false,
+   "folded": true,
+   "printed": false,
+   "adapted": "dyslexia",
+   "adaptations": [
+    "font",
+    "word spacing",
+    "letter spacing",
+    "line spacing"
+   ],
+   "readers": {
+    "fr": "aux élèves dyslexiques"
+   },
+   "file_names": [
+    "fr_FR-booklet-2-dyslexia.pdf",
+    "pt_BR-booklet-1-dyslexia-cursive-print.pdf",
+    "es_AR-booklet-3-dyslexia-script.pdf"
+   ]
+  },
+  "dyspraxia": {
+   "labels": {
+    "fr_FR": "Version différenciée",
+    "es_AR": "Versión diferenciada",
+    "pt_BR": "Versão diferenciada",
+    "it_IT": "Version différenciée"
+   },
+   "label_color": [
+    0.1411764705882353,
+    0.6666666666666666,
+    0.8823529411764706
+   ],
+   "label_bold": false,
+   "writing": true,
+   "teacher": false,
+   "folded": true,
+   "printed": false,
+   "adapted": "dyspraxia",
+   "adaptations": [
+    "font",
+    "word spacing",
+    "letter spacing",
+    "line spacing",
+    "fewer items",
+    "graphemes coloured",
+    "silent letters coloured",
+    "script only"
+   ],
+   "readers": {
+    "fr": "aux élèves dyspraxiques"
+   },
+   "file_names": [
+    "fr_FR-booklet-2-dyspraxia.pdf",
+    "pt_BR-booklet-1-dyspraxia-cursive-print.pdf",
+    "es_AR-booklet-3-dyspraxia-script.pdf"
+   ]
+  },
+  "adhd": {
+   "labels": {
+    "fr_FR": "Version différenciée",
+    "es_AR": "Versión diferenciada",
+    "pt_BR": "Versão diferenciada",
+    "it_IT": "Version différenciée"
+   },
+   "label_color": [
+    0.8627450980392157,
+    0.5882352941176471,
+    0.7607843137254902
+   ],
+   "label_bold": false,
+   "writing": true,
+   "teacher": false,
+   "folded": true,
+   "printed": false,
+   "adapted": "adhd",
+   "adaptations": [
+    "font",
+    "word spacing",
+    "letter spacing",
+    "line spacing",
+    "fewer items",
+    "graphemes coloured",
+    "silent letters coloured"
+   ],
+   "readers": {
+    "fr": "aux élèves avec des troubles de l’attention"
+   },
+   "file_names": [
+    "fr_FR-booklet-2-adhd.pdf",
+    "pt_BR-booklet-1-adhd-cursive-print.pdf",
+    "es_AR-booklet-3-adhd-script.pdf"
+   ]
+  }
+ }
+}
