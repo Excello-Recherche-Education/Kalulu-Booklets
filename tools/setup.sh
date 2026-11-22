@@ -1,7 +1,9 @@
 #!/usr/bin/env sh
 # Installs what the Godot project (project/) needs and no repository carries:
-# the godot-sqlite binaries, which BookletPackReader reads language.db with.
-# Safe to re-run.
+# the godot-sqlite binaries, which BookletPackReader reads language.db with;
+# then imports the project, which writes the class list the scripts find each
+# other by. Safe to re-run, and to be re-run after a pull: a new script is
+# unknown to the command line until the next import.
 #
 # They are copied from a Kalulu-Frontend checkout that has them (~320 MB there,
 # gitignored in every repository): $KALULU_FRONTEND, else a Kalulu-Frontend
@@ -31,9 +33,36 @@ missing_libs() {
 	done
 }
 
+import_project() {
+	# $GODOT, else what Kalulu-Main's kalulu-env.sh finds when this repository
+	# sits in it, else godot on the PATH.
+	godot="${GODOT:-}"
+	env_script="$root/../scripts/kalulu-env.sh"
+	if [ -z "$godot" ] && [ -f "$env_script" ] && command -v bash >/dev/null 2>&1; then
+		godot="$(bash -c '. "$1" >/dev/null 2>&1; printf %s "${GODOT:-}"' _ "$env_script")"
+	fi
+	[ -n "$godot" ] || godot="$(command -v godot 2>/dev/null || true)"
+	echo "== import"
+	if [ -z "$godot" ]; then
+		echo "Godot not found: set GODOT, then run" >&2
+		echo "  godot --headless --path project --import" >&2
+		exit 1
+	fi
+	"$godot" --headless --path "$root/project" --import >/dev/null 2>&1 || true
+	# The import's exit code says nothing: check the class list it writes.
+	if grep -q '"BookletBuild"' "$root/project/.godot/global_script_class_cache.cfg" 2>/dev/null; then
+		echo "done"
+	else
+		echo "the import did not write the class list: run it by hand to see why" >&2
+		echo "  $godot --headless --path project --import" >&2
+		exit 1
+	fi
+}
+
 echo "== godot-sqlite binaries"
 if [ -z "$(missing_libs "$bin")" ]; then
 	echo "already installed"
+	import_project
 	exit 0
 fi
 for candidate in "${KALULU_FRONTEND:-}" "$root/../Kalulu-Frontend"; do
@@ -47,6 +76,7 @@ for candidate in "${KALULU_FRONTEND:-}" "$root/../Kalulu-Frontend"; do
 			cp -RP "$candidate/$bin_rel/$lib" "$bin/"
 		done
 		echo "copied from $candidate/$bin_rel"
+		import_project
 		exit 0
 	fi
 done
