@@ -33,14 +33,16 @@ jobs:
     env:
       # The packs' media (~1.3 GB) are in Git LFS, and the booklets need only
       # the Look & Learn and booklet images (the teacher's pages), fetched below:
-      # language.db and fonts/ are plain files.
+      # language.db is a plain file, and fonts/ is Kalulu-Languages' own
+      # submodule, Kalulu-Fonts.
       GIT_LFS_SKIP_SMUDGE: "1"
 
     steps:
       - name: Check out the generator and the pinned language packs
         uses: actions/checkout@v5
         with:
-          submodules: true
+          # recursive: the fonts are kalulu-languages/fonts, a submodule of it.
+          submodules: recursive
           lfs: false
 
       - name: Move the language packs to the requested ref
@@ -50,6 +52,7 @@ jobs:
         run: |
           git -C kalulu-languages fetch --quiet origin "$REF"
           git -C kalulu-languages checkout --quiet --detach FETCH_HEAD
+          git -C kalulu-languages submodule update --quiet --init
 
       - name: Fetch the Look & Learn and booklet images
         run: git -C kalulu-languages lfs pull --include "*/look_and_learn/images/*,*/booklet_images/*"
