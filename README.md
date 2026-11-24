@@ -287,9 +287,11 @@ accent.
 
 The generator is a Godot 4.7 project, `project/`. Its code is
 `project/booklets/`, which the
-[Prof Tool](https://github.com/Excello-Recherche-Education/Kalulu-ProfTool) will
-copy as it is, to preview a chapter as it is edited and build booklets on every
-platform; the command line is `project/cli/`.
+[Prof Tool](https://github.com/Excello-Recherche-Education/Kalulu-ProfTool)
+copies as it is (since its version 1.5.21), to preview a chapter as it is edited
+and build booklets on every platform. Everything in it must therefore depend on
+nothing outside it, and a change here reaches the Prof Tool when its pin moves.
+The command line is `project/cli/`.
 
 | Folder | What it holds |
 |---|---|
