@@ -211,7 +211,9 @@ func draw_folio(surface: DrawingSurface, number: int) -> void:
 func run() -> Array[Page]:
 	cover()
 	for chapter in booklet.chapters:
+		laying = chapter
 		lay_chapter(chapter)
+	laying = null
 	var text: Variant = ADAPTATIONS_TEXT.get(booklet.locale.split("_")[0])
 	if text == null:
 		booklet.notes.append(("the %s version has no adaptations page in this language: its text is to be "
